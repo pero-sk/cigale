@@ -245,6 +245,8 @@ inst direction { NORTH, SOUTH, EAST, WEST }
 direction d = direction.NORTH;
 ```
 
+not working as of 0.1.0, check back in the next version.
+
 ### Access Modifiers
 
 ```
@@ -255,6 +257,8 @@ func protected x() { ... }   // own class + inheriting classes
 int public age;
 int private name;
 ```
+
+not working as of 0.1.0, check back in the next version.
 
 ### Static Context
 
@@ -279,6 +283,8 @@ static {
 static int GLOBAL = 42;
 ```
 
+not working correctly as of 0.1.0, check back in the next version.
+
 ### Error Handling
 
 ```
@@ -293,10 +299,19 @@ func safeDivide<int, int>(x, y) -> result<int> {
 }
 
 result<int> r = safeDivide(10, 2);
-if (r.err != null) {
+
+// check before getting
+if (r.is_err()) {
+    cout(r.error());    // print the error
+} else {
+    cout(r.get());      // safe to get value
+}
+
+// OR check for null error
+if (r.error() != null) {
     // handle error
 } else {
-    // use r.val
+    int val = r.get();
 }
 ```
 
@@ -306,6 +321,8 @@ class of<Error> myError { }
 
 result<int, myError> r = err(myError());
 ```
+
+not working as of 0.1.0, check back in the next version.
 
 ### Imports
 
@@ -416,6 +433,8 @@ cout(name);         // project name or null
 cout(description);  // project description or null
 ```
 
+not implemented as of 0.1.0, check back in the next version.
+
 ---
 
 ## Project Structure
@@ -438,6 +457,10 @@ version = "1.0.0";
 
 Without a project structure, `.cig` files can still be run directly via the interpreter.
 
+project structure is useless as of 0.1.0, because of:
+project.cfg isn't used without stdl.project which isn't implemented,
+project structure is meant to help the compiler which isn't implemented.
+
 ---
 
 ## Building from Source
@@ -451,8 +474,7 @@ cd cigale
 cargo build --release --bin cigale_stdl --bin cigale_nostdl --bin cigale_cli
 
 # or use the build script
-./build.ps1     # Windows PowerShell
-./build.sh      # Linux/Mac
+./build.bat     # Windows PowerShell
 ```
 
 Binaries end up in `target/release/`.
@@ -465,8 +487,9 @@ Contributions are welcome! The codebase is structured as:
 
 ```
 src/
-├── main.rs             // entry point (cigale_stdl / cigale_nostdl)
-├── main_cli.rs         // CLI tool (cigale)
+├── main.rs             // entry point (cigale_stdl)
+├── main_nostdl.rs      // entry point (cigale_nostdl)
+├── main_cli.rs         // CLI tool entry point (cigale_cli)
 ├── lexer/              // tokenizer
 ├── parser/             // AST + parser
 ├── analyser/           // semantic analysis
