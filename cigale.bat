@@ -1,0 +1,165 @@
+@echo off
+setlocal enabledelayedexpansion
+
+set REPO_URL=https://github.com/pero-sk/cigale
+set INSTALL_DIR=%USERPROFILE%\.cigale
+set BIN_DIR=%INSTALL_DIR%\bin
+set SRC_DIR=%INSTALL_DIR%\src
+
+if "%1"=="install"   goto :install
+if "%1"=="update"    goto :update
+if "%1"=="uninstall" goto :uninstall
+goto :help
+
+:check_deps
+    echo Checking dependencies...
+    where git >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo Error: git is required but not installed
+        echo Install from https://git-scm.com
+        exit /b 1
+    )
+    where cargo >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo Error: cargo is required but not installed
+        echo Install Rust from https://rustup.rs
+        exit /b 1
+    )
+    echo [OK] git found
+    echo [OK] cargo found
+    exit /b 0
+
+:add_to_path
+    for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v PATH 2^>nul') do set "CURRENT_PATH=%%b"
+    echo !CURRENT_PATH! | findstr /i "%BIN_DIR%" >nul
+    if %errorlevel% equ 0 (
+        echo PATH already contains %BIN_DIR%
+    ) else (
+        setx PATH "!CURRENT_PATH!;%BIN_DIR%"
+        echo [OK] Added %BIN_DIR% to PATH
+    )
+    exit /b 0
+
+:copy_binaries
+    echo Installing binaries...
+    copy /y "%SRC_DIR%\target\release\cigale_cli.exe"    "%BIN_DIR%\cigale.exe"    >nul
+    copy /y "%SRC_DIR%\target\release\cigale_stdl.exe"   "%BIN_DIR%\cigale_stdl.exe"   >nul
+    copy /y "%SRC_DIR%\target\release\cigale_nostdl.exe" "%BIN_DIR%\cigale_nostdl.exe" >nul
+    copy /y "%SRC_DIR%\cigale.sh"  "%BIN_DIR%\cigale.sh"  >nul
+    copy /y "%SRC_DIR%\cigale.bat" "%BIN_DIR%\cigale.bat" >nul
+    echo [OK] Binaries installed
+    exit /b 0
+
+:build
+    echo Building Cigale...
+    cd /d "%SRC_DIR%"
+    cargo build --release --bin cigale_nostdl --bin cigale_cli
+    cargo build --release --features="stdl" --bin cigale_stdl
+    if %errorlevel% neq 0 (
+        echo Build failed!
+        exit /b 1
+    )
+    exit /b 0
+
+:install
+    echo Installing Cigale...
+    call :check_deps
+    if %errorlevel% neq 0 exit /b 1
+
+    if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
+    if not exist "%SRC_DIR%" mkdir "%SRC_DIR%"
+
+    if exist "%SRC_DIR%\.git" (
+        echo Source already exists, pulling latest...
+        cd /d "%SRC_DIR%"
+        git pull
+        if %errorlevel% neq 0 (
+            echo Failed to pull latest changes!
+            exit /b 1
+        )
+    ) else (
+        echo Cloning repository...
+        git clone %REPO_URL% "%SRC_DIR%"
+        if %errorlevel% neq 0 (
+            echo Failed to clone repository!
+            exit /b 1
+        )
+    )
+
+    if not "%2"=="" (
+        echo Checking out version %2...
+        cd /d "%SRC_DIR%"
+        git checkout %2
+        if %errorlevel% neq 0 (
+            echo Failed to checkout version %2!
+            exit /b 1
+        )
+    )
+
+    call :build
+    if %errorlevel% neq 0 exit /b 1
+
+    call :copy_binaries
+    if %errorlevel% neq 0 exit /b 1
+
+    call :add_to_path
+
+    echo.
+    echo [OK] Cigale installed to %BIN_DIR%
+    echo     Restart your terminal for PATH changes to take effect.
+    echo     Then use: cigale run ^<file.cig^>
+    exit /b 0
+
+:update
+    echo Updating Cigale...
+    call :check_deps
+    if %errorlevel% neq 0 exit /b 1
+
+    if not exist "%SRC_DIR%\.git" (
+        echo Cigale is not installed. Run: cigale.bat install
+        exit /b 1
+    )
+
+    echo Pulling latest changes...
+    cd /d "%SRC_DIR%"
+    git pull
+    if %errorlevel% neq 0 (
+        echo Failed to pull latest changes!
+        exit /b 1
+    )
+
+    call :build
+    if %errorlevel% neq 0 exit /b 1
+
+    call :copy_binaries
+    if %errorlevel% neq 0 exit /b 1
+
+    echo.
+    echo [OK] Cigale updated successfully
+    exit /b 0
+
+:uninstall
+    echo Uninstalling Cigale...
+    if exist "%INSTALL_DIR%" (
+        rmdir /s /q "%INSTALL_DIR%"
+        echo [OK] Removed %INSTALL_DIR%
+    )
+
+    for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v PATH 2^>nul') do set "CURRENT_PATH=%%b"
+    set "NEW_PATH=!CURRENT_PATH:%BIN_DIR%;=!"
+    set "NEW_PATH=!NEW_PATH:;%BIN_DIR%=!"
+    setx PATH "!NEW_PATH!"
+    echo [OK] Removed from PATH
+
+    echo.
+    echo [OK] Cigale uninstalled
+    exit /b 0
+
+:help
+    echo Cigale Bootstrap Script
+    echo usage: cigale.bat ^<install^|update^|uninstall^> [version]
+    echo.
+    echo   install [version]  -- install cigale (optionally at a specific version)
+    echo   update             -- update cigale to latest
+    echo   uninstall          -- remove cigale
+    exit /b 1

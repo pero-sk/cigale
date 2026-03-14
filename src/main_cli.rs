@@ -1,58 +1,103 @@
 use std::process::Command;
 use std::path::PathBuf;
-use std::fs;
 
-const REPO_URL: &str = "https://github.com/YOUR_USERNAME/cigale";
+const REPO_URL: &str = "https://github.com/pero-sk/cigale";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(|s| s.as_str()) {
-        Some("install") => run_script("install", &[]),
-        Some("update")  => run_script("update", &[]),
-        Some("run")     => {
-            let file = match args.get(2) {
-                Some(f) => f.clone(),
-                None => {
-                    eprintln!("usage: cigale run <file.cig>");
-                    std::process::exit(1);
-                }
-            };
-            run_script("run", &[&file]);
-        }
-        Some("help") | None => print_help(),
+        Some("run")     => cmd_run(&args),
+        Some("install") => cmd_install(&args),
+        Some("update")  => cmd_update(),
+        Some("version") => cmd_version(),
+        Some("help") | None => cmd_help(),
         Some(cmd) => {
             eprintln!("unknown command: {}", cmd);
-            print_help();
+            eprintln!("run 'cigale help' for usage");
+            std::process::exit(1);
         }
     }
 }
 
-fn print_help() {
-    println!("Cigale CLI");
-    println!("----------");
-    println!("  cigale install        -- download, build and install cigale");
-    println!("  cigale update         -- update cigale to latest version");
-    println!("  cigale run <file.cig> -- run a cigale file");
+fn cmd_help() {
+    println!("Cigale {}", VERSION);
+    println!("");
+    println!("usage:");
+    println!("  cigale run <file.cig> [--no-stdl]  -- run a cigale file");
+    println!("  cigale install [version]            -- install cigale");
+    println!("  cigale update                       -- update to latest");
+    println!("  cigale version                      -- show version");
+    println!("  cigale help                         -- show this help");
 }
 
-fn run_script(command: &str, extra_args: &[&str]) {
-    if cfg!(windows) {
-        run_batch(command, extra_args);
+fn cmd_version() {
+    println!("Cigale {}", VERSION);
+}
+
+fn cmd_run(args: &[String]) {
+    let file = match args.get(2) {
+        Some(f) => f.clone(),
+        None => {
+            eprintln!("usage: cigale run <file.cig> [--no-stdl]");
+            std::process::exit(1);
+        }
+    };
+
+    let no_stdl = args.iter().any(|a| a == "--no-stdl");
+
+    // find cigale_stdl or cigale_nostdl next to this binary
+    let bin_name = if no_stdl {
+        if cfg!(windows) { "cigale_nostdl.exe" } else { "cigale_nostdl" }
     } else {
-        run_bash(command, extra_args);
+        if cfg!(windows) { "cigale_stdl.exe" } else { "cigale_stdl" }
+    };
+
+    let bin_path = get_bin_dir().join(bin_name);
+
+    if !bin_path.exists() {
+        eprintln!("error: {} not found at {}", bin_name, bin_path.display());
+        eprintln!("try running: cigale install");
+        std::process::exit(1);
+    }
+
+    let status = Command::new(&bin_path)
+        .arg(&file)
+        .status()
+        .unwrap_or_else(|e| {
+            eprintln!("failed to run {}: {}", bin_name, e);
+            std::process::exit(1);
+        });
+
+    std::process::exit(status.code().unwrap_or(1));
+}
+
+fn cmd_install(args: &[String]) {
+    let version = args.get(2).cloned(); // optional version
+    run_script("install", version.as_deref());
+}
+
+fn cmd_update() {
+    run_script("update", None);
+}
+
+fn run_script(command: &str, extra: Option<&str>) {
+    if cfg!(windows) {
+        run_batch(command, extra);
+    } else {
+        run_bash(command, extra);
     }
 }
 
-fn run_bash(command: &str, extra_args: &[&str]) {
-    // look for script next to the binary
-    let script_path = get_script_path("cigale.sh");
-    if !script_path.exists() {
-        eprintln!("error: cigale.sh not found at {}", script_path.display());
+fn run_bash(command: &str, extra: Option<&str>) {
+    let script = get_script_path("cigale.sh");
+    if !script.exists() {
+        eprintln!("error: cigale.sh not found at {}", script.display());
         std::process::exit(1);
     }
     let mut cmd = Command::new("bash");
-    cmd.arg(&script_path).arg(command);
-    for arg in extra_args { cmd.arg(arg); }
+    cmd.arg(&script).arg(command);
+    if let Some(extra) = extra { cmd.arg(extra); }
     let status = cmd.status().unwrap_or_else(|e| {
         eprintln!("failed to run cigale.sh: {}", e);
         std::process::exit(1);
@@ -60,15 +105,15 @@ fn run_bash(command: &str, extra_args: &[&str]) {
     std::process::exit(status.code().unwrap_or(1));
 }
 
-fn run_batch(command: &str, extra_args: &[&str]) {
-    let script_path = get_script_path("cigale.bat");
-    if !script_path.exists() {
-        eprintln!("error: cigale.bat not found at {}", script_path.display());
+fn run_batch(command: &str, extra: Option<&str>) {
+    let script = get_script_path("cigale.bat");
+    if !script.exists() {
+        eprintln!("error: cigale.bat not found at {}", script.display());
         std::process::exit(1);
     }
     let mut cmd = Command::new("cmd");
-    cmd.args(&["/C", script_path.to_str().unwrap(), command]);
-    for arg in extra_args { cmd.arg(arg); }
+    cmd.args(&["/C", script.to_str().unwrap(), command]);
+    if let Some(extra) = extra { cmd.arg(extra); }
     let status = cmd.status().unwrap_or_else(|e| {
         eprintln!("failed to run cigale.bat: {}", e);
         std::process::exit(1);
@@ -76,13 +121,18 @@ fn run_batch(command: &str, extra_args: &[&str]) {
     std::process::exit(status.code().unwrap_or(1));
 }
 
-fn get_script_path(script_name: &str) -> PathBuf {
-    // look next to the executable first
-    let exe = std::env::current_exe().unwrap_or_default();
-    let next_to_exe = exe.parent().unwrap_or(std::path::Path::new(".")).join(script_name);
-    if next_to_exe.exists() {
-        return next_to_exe;
-    }
-    // fall back to current directory
-    PathBuf::from(script_name)
+fn get_bin_dir() -> PathBuf {
+    std::env::current_exe()
+        .unwrap_or_default()
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .to_path_buf()
+}
+
+fn get_script_path(name: &str) -> PathBuf {
+    // next to binary first
+    let next_to_bin = get_bin_dir().join(name);
+    if next_to_bin.exists() { return next_to_bin; }
+    // fall back to cwd
+    PathBuf::from(name)
 }

@@ -19,7 +19,7 @@ path = "src/main_nostdl.rs"
 
 [[bin]]
 name = "cigale_cli"
-path = "stc/main_cli.rs"
+path = "src/main_cli.rs"
 
 
 [dependencies]
