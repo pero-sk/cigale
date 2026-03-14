@@ -39,11 +39,13 @@ func public static main() {
 - [Git](https://git-scm.com)
 
 ### Linux/Mac
+download ```cigale.sh``` from releases.
 ```bash
 chmod +x cigale.sh && ./cigale.sh install
 ```
 
 ### Windows
+download ```cigale.bat``` from releases.
 ```batch
 cigale.bat install
 ```
