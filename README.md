@@ -245,8 +245,6 @@ inst direction { NORTH, SOUTH, EAST, WEST }
 direction d = direction.NORTH;
 ```
 
-not working as of 0.1.0, check back in the next version.
-
 ### Access Modifiers
 
 ```
