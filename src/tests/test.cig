@@ -1,0 +1,12 @@
+import stdl.console { cout };
+import stdl.json { parse, stringify };
+
+func public static main() {
+    str arr = "[5, 10, 15, 20, 25, 30, 24]";
+    list cont = parse(arr);
+    foreach (num, cont) {
+        if (num ~ 2 == 0) {
+            cout($"Even! {num}");
+        }
+    }
+}
