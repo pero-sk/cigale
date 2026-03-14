@@ -81,6 +81,7 @@ fn json_to_value(json: serde_json::Value) -> Value {
             }
             Value::Instance {
                 class_name: "json_object".to_string(),
+                parent: None,
                 fields,
             }
         }

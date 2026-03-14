@@ -15,6 +15,7 @@ fn make_error_instance(args: Vec<Value>) -> Result<Value, String> {
     let msg = args.into_iter().next().unwrap_or(Value::Null);
     Ok(Value::Instance {
         class_name: "Error".to_string(),
+        parent: Some("Error".to_string()),
         fields: {
             let mut m = HashMap::new();
             m.insert("msg".to_string(), msg);
@@ -50,6 +51,7 @@ pub fn make_err_result(msg: String) -> Value {
 fn make_error(msg: String) -> Value {
     Value::Instance {
         class_name: "Error".to_string(),
+        parent: None,
         fields: {
             let mut m = HashMap::new();
             m.insert("msg".to_string(), Value::Str(msg));

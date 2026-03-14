@@ -265,18 +265,21 @@ impl Analyser {
                 if items.is_empty() {
                     return Some(Type::List(None));
                 }
-                // infer type from first element
-                let first_ty = self.infer_type(&items[0])?;
-                // check all elements match
-                for item in items.iter().skip(1) {
-                    if let Some(item_ty) = self.infer_type(item) {
-                        if !self.types_compatible(&first_ty, &item_ty) {
-                            // mixed types -- untyped list
-                            return Some(Type::List(None));
+                let mut element_types: Vec<Type> = Vec::new();
+                for item in items.iter() {
+                    if let Some(ty) = self.infer_type(&item.clone()) {
+                        if !element_types.iter().any(|t| self.types_compatible(t, &ty) || self.types_compatible(&ty, t)) {
+                            element_types.push(ty);
                         }
                     }
                 }
-                Some(Type::List(Some(vec![first_ty])))
+                // coerce numeric types to widest
+                let coerced = coerce_numeric_types(element_types);
+                if coerced.is_empty() {
+                    Some(Type::List(None))
+                } else {
+                    Some(Type::List(Some(coerced)))
+                }
             }
             Expr::CastExpr { expr, to } => {
                 if let Some(from_ty) = self.infer_type(expr) {
@@ -333,9 +336,13 @@ impl Analyser {
             (Type::List(_), Type::List(None)) => true,
             (Type::List(None), Type::List(_)) => true,
             // typed list
-            (Type::List(Some(a)), Type::List(Some(b))) => {
-                a.len() == b.len() && a.iter().zip(b.iter())
-                    .all(|(a, b)| self.types_compatible(a, b))
+            (Type::List(Some(expected)), Type::List(Some(actual))) => {
+                // each actual element type must match at least one expected type
+                actual.iter().all(|actual_ty| {
+                    expected.iter().any(|expected_ty| {
+                        self.types_compatible(expected_ty, actual_ty)
+                    })
+                })
             }
             // user types
             (Type::UserType(a), Type::UserType(b)) => a == b,
@@ -380,7 +387,7 @@ impl Analyser {
     }
     }
 
-fn type_to_str(ty: &Type) -> String {
+pub fn type_to_str(ty: &Type) -> String {
     match ty {
         Type::Int              => "int".to_string(),
         Type::Float            => "float".to_string(),
@@ -412,4 +419,26 @@ fn expr_to_str(expr: &Expr) -> String {
         Expr::IndexExpr { object, index } => format!("{}[{}]", expr_to_str(object), expr_to_str(index)),
         _ => "<expr>".to_string(),
     }
+}
+
+pub fn coerce_numeric_types(types: Vec<Type>) -> Vec<Type> {
+    let has_double = types.iter().any(|t| matches!(t, Type::Double));
+    let has_float  = types.iter().any(|t| matches!(t, Type::Float));
+    let has_int    = types.iter().any(|t| matches!(t, Type::Int));
+    let non_numeric: Vec<Type> = types.into_iter()
+        .filter(|t| !matches!(t, Type::Int | Type::Float | Type::Double))
+        .collect();
+
+    let mut result = non_numeric;
+
+    // widen to the broadest numeric type present
+    if has_double {
+        result.push(Type::Double);
+    } else if has_float {
+        result.push(Type::Float);
+    } else if has_int {
+        result.push(Type::Int);
+    }
+
+    result
 }

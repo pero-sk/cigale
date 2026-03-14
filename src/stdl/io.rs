@@ -30,6 +30,7 @@ pub fn handle(function: &str, args: Vec<Value>) -> Option<Result<Value, String>>
 fn make_error(msg: String) -> Value {
     Value::Instance {
         class_name: "Error".to_string(),
+        parent: None,
         fields: {
             let mut m = HashMap::new();
             m.insert("msg".to_string(), Value::Str(msg));

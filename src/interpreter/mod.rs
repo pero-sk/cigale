@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 #[cfg(feature = "stdl")]
 use std::sync::Mutex;
+use crate::analyser::type_to_str;
 use crate::parser::ast::BinaryOp;
 use crate::parser::ast::Expr;
 use crate::parser::ast::FunctionDecl;
@@ -13,7 +14,6 @@ use crate::parser::ast::StringPart;
 use crate::parser::ast::Type;
 use crate::parser::ast::Literal;
 use crate::parser::ast::UnaryOp;
-
 #[derive(Debug, Clone)]
 pub enum Signal {
     Return(Value),
@@ -101,6 +101,7 @@ pub enum Value {
     Instance {
         class_name: String,
         fields: HashMap<String, Value>,
+        parent: Option<String>,
     },
     ResultVal {
         val: Box<Value>,
@@ -234,10 +235,21 @@ impl Interpreter {
                 self.eval_expr(expr).map_err(ExecError::Error)?;
                 Ok(None)
             }
-            Stmt::VariableDeclaration { name, value, .. } => {
+            Stmt::VariableDeclaration { name, ty, value, is_static } => {
                 let val = match value {
-                    Some(e) => self.eval_expr(e).map_err(ExecError::Error)?,
+                    Some(e) => self.eval_expr(e)?,
                     None => Value::Null,
+                };
+                // coerce list elements to declared type
+                let val = match (&ty, val) {
+                    (Some(Type::List(Some(types))), Value::List(items)) => {
+                        let coerced: Result<Vec<Value>, String> = items.into_iter().map(|item| {
+                            self.coerce_to_type(item, &types[0])
+                        }).collect();
+                        Value::List(coerced?)
+                    }
+                    (Some(t), v) => self.coerce_to_type(v, t)?,
+                    (None, v) => v,
                 };
                 self.env.set(&name, val);
                 Ok(None)
@@ -432,7 +444,10 @@ impl Interpreter {
                 for item in items {
                     if let Some(ref t) = ty {
                         if !self.type_matches(t, &item) {
-                            return Err(ExecError::Error(format!("foreach type mismatch: expected {:?}", t)));
+                            return Err(ExecError::Error(format!(
+                                "foreach type mismatch: expected {} but got {} (value: {:?})",
+                                type_to_str(t), value_to_str(&item), item
+                            )));
                         }
                     }
                     let old_env = std::mem::replace(&mut self.env, Environment::new());
@@ -1003,6 +1018,7 @@ impl Interpreter {
 
             return Ok(Value::Instance {
                 class_name: name,
+                parent: class.parent.clone(),
                 fields,
             });
         }
@@ -1127,7 +1143,7 @@ impl Interpreter {
             }
 
             // Error instance field access
-            Value::Instance { ref class_name, ref fields } if class_name == "Error" => {
+            Value::Instance { ref class_name, ref fields, .. } if class_name == "Error" => {
                 match method.as_str() {
                     "msg" => Ok(fields.get("msg").cloned().unwrap_or(Value::Null)),
                     _ => self.eval_instance_method(obj_val.clone(), method, arg_vals),
@@ -1155,7 +1171,7 @@ impl Interpreter {
 
    pub fn eval_instance_method(&mut self, obj: Value, method: String, args: Vec<Value>) -> Result<Value, String> {
         match obj {
-                Value::Instance { class_name, fields } => {
+                Value::Instance { class_name, fields, .. } => {
                     // check for field access first (no args, field exists)
                     if args.is_empty() {
                         if let Some(val) = fields.get(&method) {
@@ -1239,4 +1255,35 @@ impl Interpreter {
                 _ => Err(format!("cannot call method {} on non-instance", method)),
             }
         }
+
+        fn coerce_to_type(&self, val: Value, ty: &Type) -> Result<Value, String> {
+            match (val, ty) {
+                (Value::Int(n),   Type::Float)  => Ok(Value::Float(n as f32)),
+                (Value::Int(n),   Type::Double) => Ok(Value::Double(n as f64)),
+                (Value::Float(f), Type::Double) => Ok(Value::Double(f as f64)),
+                (v, _) => Ok(v), // no coercion needed
+            }
+        }
+}
+
+
+fn value_to_str(ty: &Value) -> String {
+    match ty {
+        Value::Int(..) => "int".to_string(),
+        Value::Float(..) => "float".to_string(),
+        Value::Double(..) => "double".to_string(),
+        Value::Str(..) => "str".to_string(),
+        Value::Bool(..) => "bool".to_string(),
+        Value::List(values) => {
+            let inner = values.iter().map(value_to_str).collect::<Vec<_>>().join(" | ");
+            format!("list<{}>", inner)
+        },
+        Value::EnumVariant(..) => "enum".to_string(),
+        Value::Instance { .. } => "class".to_string(),
+        Value::ResultVal { .. } => "result".to_string(),
+        Value::NativeHandle( .. ) => "stdl_native".to_string(),
+        Value::Function( .. ) => "function".to_string(),
+        Value::Identifier( .. ) => "identifier".to_string(),
+        Value::Null => "null".to_string(),
+    }
 }

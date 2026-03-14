@@ -122,7 +122,7 @@ impl Lexer {
             Some('d') => { self.advance(); Some(Token::DoubleLiteral(num.parse().unwrap())) }
             _ => {
                 if is_decimal {
-                    Some(Token::FloatLiteral(num.parse().unwrap()))
+                    Some(Token::DoubleLiteral(num.parse().unwrap()))
                 } else {
                     Some(Token::IntLiteral(num.parse().unwrap()))
                 }

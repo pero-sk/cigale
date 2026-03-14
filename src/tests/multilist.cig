@@ -1,0 +1,12 @@
+import stdl.console { couts };
+
+
+func public static main() {
+    list<float> x = [0, 4, 5, 10, 15, 20, 25, 30, 30.0f];
+
+    foreach (int item, x) {
+        if (item ~ 2 == 0) {
+            couts(item<str> + " ");
+        }
+    }
+}

@@ -1,7 +1,6 @@
 use std::process::Command;
 use std::path::PathBuf;
 
-const REPO_URL: &str = "https://github.com/pero-sk/cigale";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {

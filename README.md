@@ -1,10 +1,10 @@
 ## problems
 
-enums don't work (parser issue, possibly interpreter too)
+~~enums don't work (parser issue, possibly interpreter too)~~ Enums have worked, the parser was being buggy as a one-time thing, aka I didn't do anything but they work!
 
-analyser doesn't cover every single possible error, such as this which was discovered:
+analyser doesn't cover every single possible error, ~~such as this which was discovered:
 ```list<str|int> mixed = ["hello", 1, 2.0f];```
-would pass analysis.
+would pass analysis.~~ this issue specifically was fixed. This will change upon new analyser issues.
 
 # Cigale
 
@@ -244,8 +244,6 @@ inst direction { NORTH, SOUTH, EAST, WEST }
 
 direction d = direction.NORTH;
 ```
-
-not working as of 0.1.0, check back in the next version.
 
 ### Access Modifiers
 
