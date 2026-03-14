@@ -115,16 +115,26 @@ fn run_bash(command: &str, extra: Option<&str>) {
 }
 
 fn run_batch(command: &str, extra: Option<&str>) {
-    let script = get_script_path("cigale.bat");
+    let script = get_script_path("cigale_update.bat");
     if !script.exists() {
-        eprintln!("error: cigale.bat not found at {}", script.display());
-        std::process::exit(1);
+        // fall back to cigale.bat for fresh installs
+        let script = get_script_path("cigale.bat");
+        if !script.exists() {
+            eprintln!("error: cigale_update.bat not found");
+            eprintln!("try downloading cigale.bat and running it directly");
+            std::process::exit(1);
+        }
     }
+    let script = if get_script_path("cigale_update.bat").exists() {
+        get_script_path("cigale_update.bat")
+    } else {
+        get_script_path("cigale.bat")
+    };
     let mut cmd = Command::new("cmd");
     cmd.args(&["/C", script.to_str().unwrap(), command]);
     if let Some(extra) = extra { cmd.arg(extra); }
     let status = cmd.status().unwrap_or_else(|e| {
-        eprintln!("failed to run cigale.bat: {}", e);
+        eprintln!("failed to run script: {}", e);
         std::process::exit(1);
     });
     std::process::exit(status.code().unwrap_or(1));
