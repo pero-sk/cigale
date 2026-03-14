@@ -4,6 +4,15 @@ use std::path::PathBuf;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    let exe = std::env::current_exe().unwrap_or_default();
+    let pending = exe.parent().unwrap_or(std::path::Path::new("."))
+        .join(if cfg!(windows) { "cigale_pending.exe" } else { "cigale_pending" });
+    if pending.exists() {
+        // we can rename it now since we're the running process
+        let _ = std::fs::remove_file(&pending);
+    }
+
+
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(|s| s.as_str()) {
         Some("run")     => cmd_run(&args),

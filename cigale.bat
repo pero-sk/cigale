@@ -6,10 +6,10 @@ set INSTALL_DIR=%USERPROFILE%\.cigale
 set BIN_DIR=%INSTALL_DIR%\bin
 set SRC_DIR=%INSTALL_DIR%\src
 
-if "%1"=="install"   goto :install
-if "%1"=="update"    goto :update
-if "%1"=="uninstall" goto :uninstall
-goto :help
+if /i "%~1"=="install" goto install
+if /i "%~1"=="update" goto update
+if /i "%~1"=="uninstall" goto uninstall
+goto help
 
 :check_deps
     echo Checking dependencies...
@@ -42,23 +42,25 @@ goto :help
 
 :copy_binaries
     echo Installing binaries...
-    copy /y "%SRC_DIR%\target\release\cigale_cli.exe"    "%BIN_DIR%\cigale.exe"    >nul
-    copy /y "%SRC_DIR%\target\release\cigale_stdl.exe"   "%BIN_DIR%\cigale_stdl.exe"   >nul
-    copy /y "%SRC_DIR%\target\release\cigale_nostdl.exe" "%BIN_DIR%\cigale_nostdl.exe" >nul
-    copy /y "%SRC_DIR%\cigale.sh"  "%BIN_DIR%\cigale.sh"  >nul
-    copy /y "%SRC_DIR%\cigale.bat" "%BIN_DIR%\cigale.bat" >nul
-    echo [OK] Binaries installed
-    exit /b 0
 
-:build
-    echo Building Cigale...
-    cd /d "%SRC_DIR%"
-    cargo build --release --bin cigale_nostdl --bin cigale_cli
-    cargo build --release --features="stdl" --bin cigale_stdl
-    if %errorlevel% neq 0 (
-        echo Build failed!
-        exit /b 1
-    )
+    copy /y "%SRC_DIR%\target\release\cigale_stdl.exe"   "%BIN_DIR%\cigale_stdl.exe"   >nul
+    if %errorlevel% neq 0 ( echo Failed to copy cigale_stdl.exe! & exit /b 1 )
+
+    copy /y "%SRC_DIR%\target\release\cigale_nostdl.exe" "%BIN_DIR%\cigale_nostdl.exe" >nul
+    if %errorlevel% neq 0 ( echo Failed to copy cigale_nostdl.exe! & exit /b 1 )
+
+    :: stage new cigale_cli
+    copy /y "%SRC_DIR%\target\release\cigale_cli.exe" "%BIN_DIR%\cigale_pending.exe" >nul
+    if %errorlevel% neq 0 ( echo Failed to stage cigale_cli.exe! & exit /b 1 )
+
+    :: clean up any leftover bat files in bin dir
+    powershell -Command "if (Test-Path '%BIN_DIR%\cigale.bat') { Remove-Item '%BIN_DIR%\cigale.bat' -Force }"
+    powershell -Command "if (Test-Path '%BIN_DIR%\cigale_finish_update.bat') { Remove-Item '%BIN_DIR%\cigale_finish_update.bat' -Force }"
+
+    :: schedule rename in hidden window after this process exits
+    timeout 2 sleep 2 && move /y "%BIN_DIR%\cigale_pending.exe" "%BIN_DIR%\cigale.exe"
+    echo [OK] Binaries installed
+    echo     Restart your terminal to complete the update.
     exit /b 0
 
 :install
@@ -73,31 +75,27 @@ goto :help
         echo Source already exists, pulling latest...
         cd /d "%SRC_DIR%"
         git pull
-        if %errorlevel% neq 0 (
-            echo Failed to pull latest changes!
-            exit /b 1
-        )
+        if %errorlevel% neq 0 ( echo Failed to pull! & exit /b 1 )
     ) else (
         echo Cloning repository...
         git clone %REPO_URL% "%SRC_DIR%"
-        if %errorlevel% neq 0 (
-            echo Failed to clone repository!
-            exit /b 1
-        )
+        if %errorlevel% neq 0 ( echo Failed to clone! & exit /b 1 )
     )
 
     if not "%2"=="" (
         echo Checking out version %2...
         cd /d "%SRC_DIR%"
         git checkout %2
-        if %errorlevel% neq 0 (
-            echo Failed to checkout version %2!
-            exit /b 1
-        )
+        if %errorlevel% neq 0 ( echo Failed to checkout %2! & exit /b 1 )
     )
 
-    call :build
-    if %errorlevel% neq 0 exit /b 1
+    echo Building Cigale...
+    cd /d "%SRC_DIR%"
+    cargo clean
+    cargo build --release --bin cigale_nostdl --bin cigale_cli
+    if %errorlevel% neq 0 ( echo Build failed! & exit /b 1 )
+    cargo build --release --features="stdl" --bin cigale_stdl
+    if %errorlevel% neq 0 ( echo Build failed! & exit /b 1 )
 
     call :copy_binaries
     if %errorlevel% neq 0 exit /b 1
@@ -123,19 +121,22 @@ goto :help
     echo Pulling latest changes...
     cd /d "%SRC_DIR%"
     git pull
-    if %errorlevel% neq 0 (
-        echo Failed to pull latest changes!
-        exit /b 1
-    )
+    if %errorlevel% neq 0 ( echo Failed to pull! & exit /b 1 )
 
-    call :build
-    if %errorlevel% neq 0 exit /b 1
+    echo Building Cigale...
+    cd /d "%SRC_DIR%"
+    cargo clean
+    cargo build --release --bin cigale_nostdl --bin cigale_cli
+    if %errorlevel% neq 0 ( echo Build failed! & exit /b 1 )
+    cargo build --release --features="stdl" --bin cigale_stdl
+    if %errorlevel% neq 0 ( echo Build failed! & exit /b 1 )
 
     call :copy_binaries
     if %errorlevel% neq 0 exit /b 1
 
     echo.
     echo [OK] Cigale updated successfully
+    echo     Restart your terminal to complete the update.
     exit /b 0
 
 :uninstall

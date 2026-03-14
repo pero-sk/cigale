@@ -82,15 +82,19 @@ install() {
     fi
 
     echo "Installing binaries..."
-    cp "$SRC_DIR/target/release/cigale_cli"    "$BIN_DIR/cigale"
     cp "$SRC_DIR/target/release/cigale_stdl"   "$BIN_DIR/cigale_stdl"
     cp "$SRC_DIR/target/release/cigale_nostdl" "$BIN_DIR/cigale_nostdl"
     cp "$SRC_DIR/cigale.sh"                    "$BIN_DIR/cigale.sh"
     cp "$SRC_DIR/cigale.bat"                   "$BIN_DIR/cigale.bat"
-    chmod +x "$BIN_DIR/cigale"
     chmod +x "$BIN_DIR/cigale_stdl"
     chmod +x "$BIN_DIR/cigale_nostdl"
     chmod +x "$BIN_DIR/cigale.sh"
+
+    # cigale itself -- copy to temp then rename (avoids file-in-use issues)
+    cp "$SRC_DIR/target/release/cigale_cli" "$BIN_DIR/cigale_new"
+    chmod +x "$BIN_DIR/cigale_new"
+    mv "$BIN_DIR/cigale_new" "$BIN_DIR/cigale"
+    echo "✓ Binaries installed"
 
     add_to_path
 
