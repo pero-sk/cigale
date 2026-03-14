@@ -1,6 +1,6 @@
 ## problems
 
-enums don't work (parser issue, possibly interpreter too)
+~~enums don't work (parser issue, possibly interpreter too)~~ Enums have worked, the parser was being buggy as a one-time thing, aka I didn't do anything but they work!
 
 analyser doesn't cover every single possible error, such as this which was discovered:
 ```list<str|int> mixed = ["hello", 1, 2.0f];```
