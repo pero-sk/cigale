@@ -5,10 +5,11 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let exe = std::env::current_exe().unwrap_or_default();
-    let pending = exe.parent().unwrap_or(std::path::Path::new("."))
-        .join(if cfg!(windows) { "cigale_pending.exe" } else { "cigale_pending" });
+    let bin_dir = exe.parent().unwrap_or(std::path::Path::new("."));
+    let pending = bin_dir.join(if cfg!(windows) { "cigale_pending.exe" } else { "cigale_pending" });
     if pending.exists() {
-        // we can rename it now since we're the running process
+        // pending exists but we're already running as cigale.exe
+        // so the scheduled rename worked -- just clean up pending
         let _ = std::fs::remove_file(&pending);
     }
 

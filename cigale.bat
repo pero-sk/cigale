@@ -49,16 +49,16 @@ goto help
     copy /y "%SRC_DIR%\target\release\cigale_nostdl.exe" "%BIN_DIR%\cigale_nostdl.exe" >nul
     if %errorlevel% neq 0 ( echo Failed to copy cigale_nostdl.exe! & exit /b 1 )
 
+    :: copy bat as cigale_update.bat not cigale.bat so it doesn't conflict with cigale.exe
+    copy /y "%SRC_DIR%\cigale.bat" "%BIN_DIR%\cigale_update.bat" >nul
+
     :: stage new cigale_cli
     copy /y "%SRC_DIR%\target\release\cigale_cli.exe" "%BIN_DIR%\cigale_pending.exe" >nul
     if %errorlevel% neq 0 ( echo Failed to stage cigale_cli.exe! & exit /b 1 )
 
-    :: clean up any leftover bat files in bin dir
-    powershell -Command "if (Test-Path '%BIN_DIR%\cigale.bat') { Remove-Item '%BIN_DIR%\cigale.bat' -Force }"
-    powershell -Command "if (Test-Path '%BIN_DIR%\cigale_finish_update.bat') { Remove-Item '%BIN_DIR%\cigale_finish_update.bat' -Force }"
-
     :: schedule rename in hidden window after this process exits
-    timeout 2 sleep 2 && move /y "%BIN_DIR%\cigale_pending.exe" "%BIN_DIR%\cigale.exe"
+    powershell -Command "Start-Process powershell -ArgumentList '-WindowStyle Hidden -Command sleep 1; if (Test-Path ''%BIN_DIR%\cigale.exe'') { Remove-Item ''%BIN_DIR%\cigale.exe'' -Force }; Rename-Item ''%BIN_DIR%\cigale_pending.exe'' ''cigale.exe''; Rename-item ''%BIN_DIR%\cigale_update.bat'' ''%BIN_DIR%\cigale.bat''; pause'"
+
     echo [OK] Binaries installed
     echo     Restart your terminal to complete the update.
     exit /b 0
@@ -72,21 +72,28 @@ goto help
     if not exist "%SRC_DIR%" mkdir "%SRC_DIR%"
 
     if exist "%SRC_DIR%\.git" (
-        echo Source already exists, pulling latest...
+        echo Source already exists, fetching latest...
         cd /d "%SRC_DIR%"
-        git pull
-        if %errorlevel% neq 0 ( echo Failed to pull! & exit /b 1 )
+        git fetch origin
+        if %errorlevel% neq 0 ( echo Failed to fetch! & exit /b 1 )
     ) else (
         echo Cloning repository...
         git clone %REPO_URL% "%SRC_DIR%"
         if %errorlevel% neq 0 ( echo Failed to clone! & exit /b 1 )
+        cd /d "%SRC_DIR%"
     )
 
     if not "%2"=="" (
         echo Checking out version %2...
-        cd /d "%SRC_DIR%"
         git checkout %2
         if %errorlevel% neq 0 ( echo Failed to checkout %2! & exit /b 1 )
+    ) else (
+        echo Checking out master...
+        git checkout master
+        if %errorlevel% neq 0 ( echo Failed to checkout master! & exit /b 1 )
+
+        git reset --hard origin/master
+        if %errorlevel% neq 0 ( echo Failed to reset master! & exit /b 1 )
     )
 
     echo Building Cigale...
