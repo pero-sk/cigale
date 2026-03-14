@@ -2,7 +2,9 @@
 
 enums don't work (parser issue, possibly interpreter too)
 
-
+analyser doesn't cover every single possible error, such as this which was discovered:
+```list<str|int> mixed = ["hello", 1, 2.0f];```
+would pass analysis.
 
 # Cigale
 
