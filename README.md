@@ -128,7 +128,7 @@ str concat = "hello" + " world";
 ```
 + - * /         // arithmetic (/ always returns float)
 ~               // modulo
-%               // percentage: 50 % 200 = 100 (200% of 50)
+%               // percentage: 50 % 200 = 100 (200% of 50 or 50% of 200, both are the same so it doesn't matter.)
 **              // exponent
 == != < > <= >= // comparison
 && || !         // logical
