@@ -443,7 +443,7 @@ Without a project structure, `.cig` files can still be run directly via the inte
 
 ```bash
 # clone
-git clone https://github.com/YOUR_USERNAME/cigale
+git clone https://github.com/pero-sk/cigale
 cd cigale
 
 # build all binaries
