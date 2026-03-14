@@ -226,6 +226,7 @@ class inst shape {
 
 // inheriting
 class of<shape> circle {
+    int radius = 20;
     func impl area<>() -> double {
         return 3.14159 * (radius ** 2);
     }
