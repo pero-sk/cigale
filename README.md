@@ -50,8 +50,8 @@ Restart your terminal after installing. Cigale will be available as `cigale` in 
 
 ### Specific version
 ```bash
-./cigale.sh install v1.0.0      # Linux/Mac
-cigale.bat install v1.0.0       # Windows
+./cigale.sh install <branch>      # Linux/Mac
+cigale.bat install <branch>       # Windows
 ```
 
 ---
