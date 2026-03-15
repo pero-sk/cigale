@@ -96,6 +96,13 @@ goto help
         if %errorlevel% neq 0 ( echo Failed to reset master! & exit /b 1 )
     )
 
+    :: Check for .noinstall file in the checked-out branch
+    if exist "%SRC_DIR%\.noinstall" (
+        echo Error: This branch is marked as not installable ^(.noinstall present^).
+        echo        Installation aborted.
+        exit /b 1
+    )
+
     echo Building Cigale...
     cd /d "%SRC_DIR%"
     cargo clean
