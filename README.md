@@ -476,6 +476,7 @@ cargo build --release --bin cigale_nostdl --bin cigale_cli
 
 # or use the build script
 ./build.bat     # Windows PowerShell
+./build.sh      # Unix Shell
 ```
 
 Binaries end up in `target/release/`.
