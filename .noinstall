@@ -1,0 +1,3 @@
+This file is named ".noinstall", its contents are never read.
+
+This file is used for the cigale CLI to check whether this branch is uninstallable (which it is).
