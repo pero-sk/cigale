@@ -32,15 +32,15 @@ fn cmd_help() {
     println!("Cigale {}", VERSION);
     println!("");
     println!("usage:");
-    println!("  cigale run                     -- run project using build.yml");
-    println!("  cigale run <file.cig>          -- run a single file");
-    println!("  cigale run <file.cig> [--no-stdl] -- run without stdl");
-    println!("  cigale new <project_name>      -- create a new project");
-    println!("  cigale install [version]       -- install cigale");
-    println!("  cigale fetch [--global]        -- fetch dependencies from cigale.properties");
-    println!("  cigale update                  -- update to latest");
-    println!("  cigale version                 -- show version");
-    println!("  cigale help                    -- show this help");
+    println!(" cigale run                        -- run project using build.yml");
+    println!(" cigale run <file.cig>             -- run a single file");
+    println!(" cigale run <file.cig> [--no-stdl] -- run without stdl");
+    println!(" cigale new <project_name>         -- create a new project");
+    println!(" cigale install [version]          -- install cigale");
+    println!(" cigale fetch [--global]           -- fetch dependencies from cigale.properties");
+    println!(" cigale update                     -- update to latest");
+    println!(" cigale version                    -- show version");
+    println!(" cigale help                       -- show this help");
 }
 
 fn cmd_version() {
