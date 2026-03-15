@@ -20,6 +20,7 @@ fn main() {
         Some("update")  => cmd_update(),
         Some("version") => cmd_version(),
         Some("help") | None => cmd_help(),
+        Some("remove") => cmd_remove(),
         Some(cmd) => {
             eprintln!("unknown command: {}", cmd);
             eprintln!("run 'cigale help' for usage");
@@ -41,6 +42,7 @@ fn cmd_help() {
     println!(" cigale update                     -- update to latest");
     println!(" cigale version                    -- show version");
     println!(" cigale help                       -- show this help");
+    println!(" cigale remove                     -- removes cigale from machine");
 }
 
 fn cmd_version() {
@@ -292,6 +294,10 @@ fn cmd_install(args: &[String]) {
 
 fn cmd_update() {
     run_script("update", None);
+}
+
+fn cmd_remove() {
+    run_script("uninstall", None);
 }
 
 fn run_script(command: &str, extra: Option<&str>) {
