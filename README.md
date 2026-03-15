@@ -256,7 +256,7 @@ int public age;
 int private name;
 ```
 
-not working as of 0.1.0, check back in the next version.
+not working as of 0.2.0, check back in the next version.
 
 ### Static Context
 
@@ -281,7 +281,7 @@ static {
 static int GLOBAL = 42;
 ```
 
-not working correctly as of 0.1.0, check back in the next version.
+not working correctly as of 0.2.0, check back in the next version.
 
 ### Error Handling
 
@@ -319,8 +319,6 @@ class of<Error> myError { }
 
 result<int, myError> r = err(myError());
 ```
-
-not working as of 0.1.0, check back in the next version.
 
 ### Imports
 
