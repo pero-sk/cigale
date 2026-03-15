@@ -50,6 +50,8 @@ add_to_path() {
 install() {
     local VERSION="$1"
 
+    local BACK_DIR="$PWD"
+
     echo "Installing Cigale..."
     check_deps
 
@@ -71,14 +73,17 @@ install() {
     fi
 
     echo "Building Cigale..."
-    cd "$SRC_DIR" && cargo build --release \
-        --features="stdl" \
-        --bin cigale_stdl
-    
-    cargo build --release \
-        --bin cigale_nostdl \
-        --bin cigale_cli
+    cd "$SRC_DIR"
 
+    cargo clean
+
+    cargo build --release --bin cigale_cli --bin cigale_nostdl
+    if [ $? -ne 0 ]; then
+        echo "Build failed!"
+        exit 1
+    fi
+
+    cargo build --release --bin cigale_stdl --features="stdl"
     if [ $? -ne 0 ]; then
         echo "Build failed!"
         exit 1
@@ -105,6 +110,8 @@ install() {
     echo "✓ Cigale installed to $BIN_DIR"
     echo "  Restart your terminal or run: source $SHELL_RC"
     echo "  Then use: cigale run <file.cig>"
+
+    cd $BACK_DIR
     exec $SHELL
 }
 
@@ -126,11 +133,17 @@ update() {
     fi
 
     echo "Rebuilding..."
-    cd "$SRC_DIR" && cargo build --release \
-        --bin cigale_stdl \
-        --bin cigale_nostdl \
-        --bin cigale_cli
+    cd "$SRC_DIR"
 
+    cargo clean
+
+    cargo build --release --bin cigale_cli --bin cigale_nostdl
+    if [ $? -ne 0 ]; then
+        echo "Build failed!"
+        exit 1
+    fi
+
+    cargo build --release --bin cigale_stdl --features="stdl"
     if [ $? -ne 0 ]; then
         echo "Build failed!"
         exit 1
