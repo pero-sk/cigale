@@ -96,6 +96,13 @@ goto help
         if %errorlevel% neq 0 ( echo Failed to reset master! & exit /b 1 )
     )
 
+    :: Check for .noinstall file in the checked-out branch
+    if exist "%SRC_DIR%\.noinstall" (
+        echo Error: This branch is marked as not installable ^(.noinstall present^).
+        echo        Installation aborted.
+        exit /b 1
+    )
+
     echo Building Cigale...
     cd /d "%SRC_DIR%"
     cargo clean
@@ -148,10 +155,7 @@ goto help
 
 :uninstall
     echo Uninstalling Cigale...
-    if exist "%INSTALL_DIR%" (
-        rmdir /s /q "%INSTALL_DIR%"
-        echo [OK] Removed %INSTALL_DIR%
-    )
+    powershell -Command "Start-Process powershell -WindowStyle Hidden -ArgumentList '-Command Start-Sleep 1; if (Test-Path \"%INSTALL_DIR%\") { Remove-Item -Recurse -Force \"%INSTALL_DIR%\" }'"
 
     for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v PATH 2^>nul') do set "CURRENT_PATH=%%b"
     set "NEW_PATH=!CURRENT_PATH:%BIN_DIR%;=!"
