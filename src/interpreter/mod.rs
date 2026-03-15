@@ -235,7 +235,7 @@ impl Interpreter {
                 self.eval_expr(expr).map_err(ExecError::Error)?;
                 Ok(None)
             }
-            Stmt::VariableDeclaration { name, ty, value, is_static } => {
+            Stmt::VariableDeclaration { name, ty, value, .. } => {
                 let val = match value {
                     Some(e) => self.eval_expr(e)?,
                     None => Value::Null,

@@ -678,7 +678,7 @@ impl Parser {
     fn parse_variable_decl_no_semi(&mut self) -> Result<Stmt, String> {
         let ty = self.parse_type()?;
 
-        let _access = match self.current() {
+        let access = match self.current() {
             Some(Token::Public)    => { self.advance(); Some(AccessModifier::Public) }
             Some(Token::Private)   => { self.advance(); Some(AccessModifier::Private) }
             Some(Token::Protected) => { self.advance(); Some(AccessModifier::Protected) }
@@ -704,6 +704,7 @@ impl Parser {
             name,
             ty: Some(ty),
             is_static: false,
+            access,
             value,
         })
     }
@@ -711,7 +712,7 @@ impl Parser {
     fn parse_variable_decl(&mut self) -> Result<Stmt, String> {
         let ty = self.parse_type()?;
 
-        let _access = match self.current() {
+        let access = match self.current() {
             Some(Token::Public)    => { self.advance(); Some(AccessModifier::Public) }
             Some(Token::Private)   => { self.advance(); Some(AccessModifier::Private) }
             Some(Token::Protected) => { self.advance(); Some(AccessModifier::Protected) }
@@ -737,6 +738,7 @@ impl Parser {
             name,
             ty: Some(ty),
             is_static: false,
+            access,
             value,
         })
     }

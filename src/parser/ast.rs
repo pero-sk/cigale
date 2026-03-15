@@ -162,6 +162,7 @@ pub enum Stmt {
         name: String,
         ty: Option<Type>,           // None if untyped
         is_static: bool,
+        access: Option<AccessModifier>,
         value: Option<Expr>,
     },
     // control flow

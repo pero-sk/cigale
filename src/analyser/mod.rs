@@ -18,6 +18,7 @@ pub struct Analyser {
     // enum name -> variants
     enums: HashMap<String, Vec<String>>,
     errors: Vec<AnalysisError>,
+    current_class: Option<String>,
 }
 
 impl Analyser {
@@ -28,6 +29,7 @@ impl Analyser {
             classes: HashMap::new(),
             enums: HashMap::new(),
             errors: Vec::new(),
+            current_class: None,
         }
     }
 
@@ -131,6 +133,7 @@ impl Analyser {
     }
 
     fn analyse_function(&mut self, f: &FunctionDecl) {
+
         // register params
         for (param, ty) in f.params.iter().zip(f.param_types.iter()) {
             self.vars.insert(param.name.clone(), ty.clone());
@@ -157,6 +160,9 @@ impl Analyser {
     }
 
     fn analyse_class(&mut self, c: &ClassDecl) {
+        let previous = self.current_class.clone();
+        self.current_class = Some(c.name.clone());
+
         for method in &c.body {
             // func blank only in class inst
             if method.modifiers.is_blank && !c.is_inst {
@@ -202,10 +208,95 @@ impl Analyser {
         for method in &c.body {
             self.analyse_function(method);
         }
+
+        self.current_class = previous;
     }
 
     fn analyse_expr(&mut self, expr: &Expr) {
         match expr {
+            Expr::MethodCall { object, method, args } => {
+                let obj_ty = self.infer_type(object);
+                if let Some(obj_ty) = self.infer_type(object) {
+                    if let Type::UserType(class_name) = &obj_ty {
+                        if let Some(class) = self.classes.get(class_name).cloned() {
+                            // check method access
+                            if let Some(func) = class.body.iter().find(|f| f.name == *method) {
+                                match func.modifiers.access {
+                                    AccessModifier::Private => {
+                                        // only accessible from same class
+                                        if self.current_class.as_deref() != Some(class_name) {
+                                            self.errors.push(AnalysisError::Error(format!(
+                                                "cannot access private method '{}' of class '{}' from {}",
+                                                method, class_name,
+                                                self.current_class.as_deref().unwrap_or("outside its class")
+                                            )));
+                                        }
+                                    }
+                                    AccessModifier::Protected => {
+                                        // only accessible from same class or subclass
+                                        match &self.current_class {
+                                            None => {
+                                                self.errors.push(AnalysisError::Error(format!(
+                                                    "cannot access protected method '{}' of class '{}' from outside of its class",
+                                                    method, class_name
+                                                )));
+                                            }
+                                            Some(caller) => {
+                                                if !self.inherits_from(caller, class_name) {
+                                                    self.errors.push(AnalysisError::Error(format!(
+                                                        "cannot access protected method '{}' of class '{}' from '{}'",
+                                                        method, class_name, caller
+                                                    )));
+                                                }
+                                            }
+                                        }
+                                    }
+                                    AccessModifier::Public => {} // always ok
+                                }
+                            }
+                            // check field access
+                            for field in &class.fields {
+                                if let Stmt::VariableDeclaration { name, access, .. } = field {
+                                    if name == method {
+                                        match access {
+                                            Some(AccessModifier::Private) => {
+                                                if self.current_class.as_deref() != Some(class_name.as_str()) {
+                                                    self.errors.push(AnalysisError::Error(format!(
+                                                        "cannot access private field '{}' of class '{}' from {}",
+                                                        method, class_name,
+                                                        self.current_class.as_deref().unwrap_or("outside its class")
+                                                    )));
+                                                }
+                                            }
+                                            Some(AccessModifier::Protected) => {
+                                                match &self.current_class {
+                                                    None => {
+                                                        self.errors.push(AnalysisError::Error(format!(
+                                                            "cannot access protected field '{}' of class '{}' from outside its class",
+                                                            method, class_name
+                                                        )));
+                                                    }
+                                                    Some(caller) => {
+                                                        if !self.inherits_from(caller, class_name) {
+                                                            self.errors.push(AnalysisError::Error(format!(
+                                                                "cannot access protected field '{}' of class '{}' from '{}'",
+                                                                method, class_name, caller
+                                                            )));
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                for arg in args { self.analyse_expr(arg); }
+            }
+
             Expr::FunctionCall { name, args } => {
                 if let Some((param_types, _)) = self.functions.get(name).cloned() {
                     // check arg count
@@ -239,7 +330,23 @@ impl Analyser {
             Expr::ListLiteral(items) => {
                 for item in items { self.analyse_expr(item); }
             }
-            _ => {}
+            Expr::CastExpr { expr, to } => {
+                self.analyse_expr(expr);  // add this!
+                if let Some(from_ty) = self.infer_type(expr) {
+                    let (valid, warning) = self.cast_valid(&from_ty, to);
+                    if let Some(w) = warning {
+                        self.errors.push(AnalysisError::Warning(w));
+                    }
+                    if !valid {
+                        self.errors.push(AnalysisError::Error(format!(
+                            "invalid cast from {} to {}: cannot cast '{}' to {}",
+                            type_to_str(&from_ty), type_to_str(to),
+                            expr_to_str(expr), type_to_str(to)
+                        )));
+                    }
+                }
+            }
+            _ => {println!("Warning: undefined analysis behaviour for: {}", expr_to_str(expr))}
         }
     }
 
@@ -385,7 +492,18 @@ impl Analyser {
             _ => (false, None),
         }
     }
+
+    fn inherits_from(&self, class_name: &str, target: &str) -> bool {
+        if class_name == target { return true; }
+        match self.classes.get(class_name) {
+            Some(c) => match &c.parent {
+                Some(parent) => self.inherits_from(parent, target),
+                None => false,
+            }
+            None => false,
+        }
     }
+}
 
 pub fn type_to_str(ty: &Type) -> String {
     match ty {
