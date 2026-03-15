@@ -50,6 +50,8 @@ download ```cigale.bat``` from releases.
 cigale.bat install
 ```
 
+Please note that by default (running without a specific version), the install subcommand will install 0.1.0 and not latest.
+
 Restart your terminal after installing. Cigale will be available as `cigale` in your PATH.
 
 ### Specific version
