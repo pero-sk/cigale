@@ -63,11 +63,15 @@ cigale.bat install <branch>       # Windows
 ## Usage
 
 ```bash
-cigale run <file.cig>           # run with stdl
-cigale run <file.cig> --no-stdl # run without stdl
-cigale update                   # update to latest
-cigale version                  # show version
-cigale help                     # show help
+ cigale run                        # run project using build.yml
+ cigale run <file.cig>             # run a single file
+ cigale run <file.cig> [--no-stdl] # run without stdl
+ cigale new <project_name>         # create a new project
+ cigale install [version]          # install cigale
+ cigale fetch [--global]           # fetch dependencies from cigale.properties
+ cigale update                     # update to latest
+ cigale version                    # show version
+ cigale help                       # show this help
 ```
 
 ---
@@ -429,7 +433,7 @@ cout(name);         // project name or null
 cout(description);  // project description or null
 ```
 
-not implemented as of 0.1.0, check back in the next version.
+not implemented as of 0.2.0, check back in the next version.
 
 ---
 
@@ -453,7 +457,7 @@ version = "1.0.0";
 
 Without a project structure, `.cig` files can still be run directly via the interpreter.
 
-project.cfg is useless as of 0.1.0, because it isn't used without stdl.project which isn't implemented.
+project.cfg is useless as of 0.2.0, because it isn't used without stdl.project which isn't implemented.
 
 use `cigale new <project_name>` to setup a basic project structure.
 

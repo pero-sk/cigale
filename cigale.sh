@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPO_URL="https://github.com/YOUR_USERNAME/cigale"
+REPO_URL="https://github.com/pero-sk/cigale"
 INSTALL_DIR="$HOME/.cigale"
 BIN_DIR="$INSTALL_DIR/bin"
 SRC_DIR="$INSTALL_DIR/src"
@@ -72,7 +72,10 @@ install() {
 
     echo "Building Cigale..."
     cd "$SRC_DIR" && cargo build --release \
-        --bin cigale_stdl \
+        --features="stdl" \
+        --bin cigale_stdl
+    
+    cargo build --release \
         --bin cigale_nostdl \
         --bin cigale_cli
 
@@ -102,6 +105,7 @@ install() {
     echo "✓ Cigale installed to $BIN_DIR"
     echo "  Restart your terminal or run: source $SHELL_RC"
     echo "  Then use: cigale run <file.cig>"
+    exec $SHELL
 }
 
 update() {
