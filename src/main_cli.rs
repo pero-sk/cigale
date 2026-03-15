@@ -8,15 +8,13 @@ fn main() {
     let bin_dir = exe.parent().unwrap_or(std::path::Path::new("."));
     let pending = bin_dir.join(if cfg!(windows) { "cigale_pending.exe" } else { "cigale_pending" });
     if pending.exists() {
-        // pending exists but we're already running as cigale.exe
-        // so the scheduled rename worked -- just clean up pending
         let _ = std::fs::remove_file(&pending);
     }
-
 
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(|s| s.as_str()) {
         Some("run")     => cmd_run(&args),
+        Some("new")     => cmd_new(&args),
         Some("install") => cmd_install(&args),
         Some("update")  => cmd_update(),
         Some("version") => cmd_version(),
@@ -33,11 +31,14 @@ fn cmd_help() {
     println!("Cigale {}", VERSION);
     println!("");
     println!("usage:");
-    println!("  cigale run <file.cig> [--no-stdl]  -- run a cigale file");
-    println!("  cigale install [version]            -- install cigale");
-    println!("  cigale update                       -- update to latest");
-    println!("  cigale version                      -- show version");
-    println!("  cigale help                         -- show this help");
+    println!("  cigale run                     -- run project using build.yml");
+    println!("  cigale run <file.cig>          -- run a single file");
+    println!("  cigale run <file.cig> --no-stdl -- run without stdl");
+    println!("  cigale new <project_name>      -- create a new project");
+    println!("  cigale install [version]       -- install cigale");
+    println!("  cigale update                  -- update to latest");
+    println!("  cigale version                 -- show version");
+    println!("  cigale help                    -- show this help");
 }
 
 fn cmd_version() {
@@ -45,18 +46,66 @@ fn cmd_version() {
 }
 
 fn cmd_run(args: &[String]) {
-    let file = match args.get(2) {
-        Some(f) => f.clone(),
-        None => {
-            eprintln!("usage: cigale run <file.cig> [--no-stdl]");
+    // no file specified -- look for build.yml
+    if args.get(2).is_none() || args.get(2).map(|s| s.starts_with("--")).unwrap_or(false) {
+        let build_yml = std::path::Path::new("build.yml");
+        if build_yml.exists() {
+            run_from_build_yml(build_yml);
+            return;
+        } else {
+            eprintln!("error: no file specified and no build.yml found in current directory");
+            eprintln!("usage: cigale run <file.cig>");
+            eprintln!("       cigale run  (if build.yml exists in cwd)");
+            std::process::exit(1);
+        }
+    }
+
+    let file = args.get(2).unwrap().clone();
+    let no_stdl = args.iter().any(|a| a == "--no-stdl");
+    run_file(&file, !no_stdl);
+}
+
+fn run_from_build_yml(path: &std::path::Path) {
+    let content = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error reading build.yml: {}", e);
             std::process::exit(1);
         }
     };
 
-    let no_stdl = args.iter().any(|a| a == "--no-stdl");
+    let mut entry = None;
+    let mut use_stdl = true;
 
-    // find cigale_stdl or cigale_nostdl next to this binary
-    let bin_name = if no_stdl {
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with("entry:") {
+            entry = Some(line.trim_start_matches("entry:").trim().to_string());
+        } else if line.starts_with("stdl:") {
+            let val = line.trim_start_matches("stdl:").trim();
+            use_stdl = val == "true";
+        }
+    }
+
+    let entry = match entry {
+        Some(e) => e,
+        None => {
+            eprintln!("error: build.yml missing 'entry' field");
+            std::process::exit(1);
+        }
+    };
+
+    if !std::path::Path::new(&entry).exists() {
+        eprintln!("error: entry point '{}' not found", entry);
+        std::process::exit(1);
+    }
+
+    println!("Running {}...", entry);
+    run_file(&entry, use_stdl);
+}
+
+fn run_file(file: &str, use_stdl: bool) {
+    let bin_name = if !use_stdl {
         if cfg!(windows) { "cigale_nostdl.exe" } else { "cigale_nostdl" }
     } else {
         if cfg!(windows) { "cigale_stdl.exe" } else { "cigale_stdl" }
@@ -71,7 +120,7 @@ fn cmd_run(args: &[String]) {
     }
 
     let status = Command::new(&bin_path)
-        .arg(&file)
+        .arg(file)
         .status()
         .unwrap_or_else(|e| {
             eprintln!("failed to run {}: {}", bin_name, e);
@@ -81,8 +130,65 @@ fn cmd_run(args: &[String]) {
     std::process::exit(status.code().unwrap_or(1));
 }
 
+fn cmd_new(args: &[String]) {
+    let name = match args.get(2) {
+        Some(n) => n.clone(),
+        None => {
+            eprintln!("usage: cigale new <project_name>");
+            std::process::exit(1);
+        }
+    };
+
+    let project_dir = std::path::Path::new(&name);
+    if project_dir.exists() {
+        eprintln!("error: directory '{}' already exists", name);
+        std::process::exit(1);
+    }
+
+    // create project structure
+    std::fs::create_dir_all(project_dir.join("src")).unwrap_or_else(|e| {
+        eprintln!("error creating project directory: {}", e);
+        std::process::exit(1);
+    });
+
+    // project.cfg
+    std::fs::write(
+        project_dir.join("project.cfg"),
+        format!("name = \"{}\";\ndescription = \"\";\nversion = \"0.1.0\";\n", name)
+    ).unwrap();
+
+    // cigale.properties
+    std::fs::write(
+        project_dir.join("cigale.properties"),
+        "[dependencies]\n"
+    ).unwrap();
+
+    // build.yml
+    std::fs::write(
+        project_dir.join("build.yml"),
+        "entry: src/main.cig\nstdl: true\n"
+    ).unwrap();
+
+    // src/main.cig
+    std::fs::write(
+        project_dir.join("src").join("main.cig"),
+        "import stdl.console { cout };\n\nfunc public static main() {\n    cout(\"Hello, world!\");\n}\n"
+    ).unwrap();
+
+    println!("Created project '{}'", name);
+    println!("");
+    println!("  {}/", name);
+    println!("  ├── project.cfg");
+    println!("  ├── cigale.properties");
+    println!("  ├── build.yml");
+    println!("  └── src/");
+    println!("      └── main.cig");
+    println!("");
+    println!("  cd {} && cigale run", name);
+}
+
 fn cmd_install(args: &[String]) {
-    let version = args.get(2).cloned(); // optional version
+    let version = args.get(2).cloned();
     run_script("install", version.as_deref());
 }
 
@@ -115,20 +221,14 @@ fn run_bash(command: &str, extra: Option<&str>) {
 }
 
 fn run_batch(command: &str, extra: Option<&str>) {
-    let script = get_script_path("cigale_update.bat");
-    if !script.exists() {
-        // fall back to cigale.bat for fresh installs
-        let script = get_script_path("cigale.bat");
-        if !script.exists() {
-            eprintln!("error: cigale_update.bat not found");
-            eprintln!("try downloading cigale.bat and running it directly");
-            std::process::exit(1);
-        }
-    }
     let script = if get_script_path("cigale_update.bat").exists() {
         get_script_path("cigale_update.bat")
-    } else {
+    } else if get_script_path("cigale.bat").exists() {
         get_script_path("cigale.bat")
+    } else {
+        eprintln!("error: cigale_update.bat not found");
+        eprintln!("try downloading cigale.bat and running it directly");
+        std::process::exit(1);
     };
     let mut cmd = Command::new("cmd");
     cmd.args(&["/C", script.to_str().unwrap(), command]);
@@ -149,9 +249,7 @@ fn get_bin_dir() -> PathBuf {
 }
 
 fn get_script_path(name: &str) -> PathBuf {
-    // next to binary first
     let next_to_bin = get_bin_dir().join(name);
     if next_to_bin.exists() { return next_to_bin; }
-    // fall back to cwd
     PathBuf::from(name)
 }
