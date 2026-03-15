@@ -148,10 +148,7 @@ goto help
 
 :uninstall
     echo Uninstalling Cigale...
-    if exist "%INSTALL_DIR%" (
-        rmdir /s /q "%INSTALL_DIR%"
-        echo [OK] Removed %INSTALL_DIR%
-    )
+    powershell -Command "Start-Process powershell -WindowStyle Hidden -ArgumentList '-Command sleep 1; if exist "%INSTALL_DIR%" (rmdir /s /q "%INSTALL_DIR%"; echo [OK] Removed %INSTALL_DIR%;)'"
 
     for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v PATH 2^>nul') do set "CURRENT_PATH=%%b"
     set "NEW_PATH=!CURRENT_PATH:%BIN_DIR%;=!"
