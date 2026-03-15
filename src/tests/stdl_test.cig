@@ -1,7 +1,0 @@
-import stdl.console { cout };
-
-func public static main() {
-    list<str> x = [0<str>,1<str>,2<str>,3<str>];
-    int y = x<int>;
-    cout(x[0]<str>);
-}
