@@ -57,7 +57,7 @@ goto help
     if %errorlevel% neq 0 ( echo Failed to stage cigale_cli.exe! & exit /b 1 )
 
     :: schedule rename in hidden window after this process exits
-    powershell -Command "Start-Process powershell -ArgumentList '-WindowStyle Hidden -Command sleep 1; if (Test-Path ''%BIN_DIR%\cigale.exe'') { Remove-Item ''%BIN_DIR%\cigale.exe'' -Force }; Rename-Item ''%BIN_DIR%\cigale_pending.exe'' ''cigale.exe''; Rename-item ''%BIN_DIR%\cigale_update.bat'' ''%BIN_DIR%\cigale.bat''; pause'"
+    powershell -Command "Start-Process powershell -ArgumentList '-WindowStyle Hidden -Command sleep 1; if (Test-Path ''%BIN_DIR%\cigale.exe'') { Remove-Item ''%BIN_DIR%\cigale.exe'' -Force }; if (Test-Path ''%BIN_DIR%\cigale.bat'') { Remove-Item ''%BIN_DIR%\cigale.bat'' -Force }; Rename-Item ''%BIN_DIR%\cigale_pending.exe'' ''cigale.exe''; Move-Item ''%BIN_DIR%\cigale_update.bat'' ''%BIN_DIR%\cigale.bat'' -Force; pause'"
 
     echo [OK] Binaries installed
     echo     Restart your terminal to complete the update.
