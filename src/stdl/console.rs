@@ -46,7 +46,8 @@ fn cin(args: Vec<Value>) -> Result<Value, String> {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input)
         .map_err(|e| format!("cin error: {}", e))?;
-    Ok(Value::Str(input.trim_end_matches('\n').to_string()))
+    // trim both \r and \n
+    Ok(Value::Str(input.trim_end_matches(|c| c == '\r' || c == '\n').to_string()))
 }
 
 fn value_to_str(args: Vec<Value>) -> Result<Value, String> {
