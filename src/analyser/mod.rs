@@ -297,6 +297,9 @@ impl Analyser {
                 for arg in args { self.analyse_expr(arg); }
             }
 
+            Expr::Identifier( .. ) => {}
+            Expr::Literal( .. ) => {}
+
             Expr::FunctionCall { name, args } => {
                 if let Some((param_types, _)) = self.functions.get(name).cloned() {
                     // check arg count
