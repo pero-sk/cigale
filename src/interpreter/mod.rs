@@ -301,21 +301,47 @@ impl Interpreter {
 
                 // non-stdl import -- load the file
                 let file_name = format!("{}.cig", path.join("/"));
+                let package_name = path.first().cloned().unwrap_or_default();
 
-                // check relative to current file's directory first, then cwd
+                // check relative to current file's directory first, then cwd, then local deps folder
                 let file_path = {
+                    // 1. relative to source file
                     let relative_to_base = format!("{}/{}", self.base_dir, file_name);
+                    // 2. relative to cwd
                     let relative_to_cwd = file_name.clone();
+                    // 3. local deps folder
+                    let local_dep = if path.len() == 1 {
+                        format!("deps/{}/src/main.cig", package_name)
+                    } else {
+                        format!("deps/{}/src/{}.cig", package_name, path[1..].join("/"))
+                    };
+                    // 4. global packages
+                    let home = std::env::var("USERPROFILE")
+                        .or_else(|_| std::env::var("HOME"))
+                        .unwrap_or_else(|_| ".".to_string());
+                    let global_dep = if path.len() == 1 {
+                        format!("{}/.cigale/packages/{}/src/main.cig", home, package_name)
+                    } else {
+                        format!("{}/.cigale/packages/{}/src/{}.cig", home, package_name, path[1..].join("/"))
+                    };
+
                     if std::path::Path::new(&relative_to_base).exists() {
                         relative_to_base
                     } else if std::path::Path::new(&relative_to_cwd).exists() {
                         relative_to_cwd
+                    } else if std::path::Path::new(&local_dep).exists() {
+                        local_dep
+                    } else if std::path::Path::new(&global_dep).exists() {
+                        global_dep
                     } else {
                         return Err(ExecError::Error(format!(
-                            "cannot find import '{}' — searched:\n  {}\n  {}",
+                            "cannot find import '{}' — searched:\n  {}\n  {}\n  {}\n  {}\n  cwd: {}\n  hint: run 'cigale fetch' to install dependencies",
                             file_name,
                             relative_to_base,
-                            relative_to_cwd
+                            relative_to_cwd,
+                            local_dep,
+                            global_dep,
+                            std::env::current_dir().unwrap_or_default().display()
                         )));
                     }
                 };
@@ -324,7 +350,7 @@ impl Interpreter {
                     Ok(s) => s,
                     Err(e) => return Err(ExecError::Error(format!("failed to load import '{}': {}", file_path, e))),
                 };
-
+                
                 // lex and parse
                 let mut lexer = crate::lexer::Lexer::new(&source);
                 let tokens = lexer.tokenize();
@@ -338,7 +364,9 @@ impl Interpreter {
                 for stmt in &program.body {
                     match stmt {
                         crate::parser::ast::Stmt::FunctionDeclaration(f) => {
-                            self.env.set(&f.name, Value::Function(f.clone()));
+                            if f.name != "main" {  // never register main from imports
+                                self.env.set(&f.name, Value::Function(f.clone()));
+                            }
                         }
                         crate::parser::ast::Stmt::ClassDeclaration(c) => {
                             self.classes.insert(c.name.clone(), c.clone());

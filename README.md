@@ -453,9 +453,9 @@ version = "1.0.0";
 
 Without a project structure, `.cig` files can still be run directly via the interpreter.
 
-project structure is useless as of 0.1.0, because of:
-project.cfg isn't used without stdl.project which isn't implemented,
-project structure is meant to help the compiler which isn't implemented.
+project.cfg is useless as of 0.1.0, because it isn't used without stdl.project which isn't implemented.
+
+use `cigale new <project_name>` to setup a basic project structure.
 
 ---
 
@@ -467,7 +467,8 @@ git clone https://github.com/pero-sk/cigale
 cd cigale
 
 # build all binaries
-cargo build --release --bin cigale_stdl --bin cigale_nostdl --bin cigale_cli
+cargo build --release --features="stdl" --bin cigale_stdl
+cargo build --release --bin cigale_nostdl --bin cigale_cli
 
 # or use the build script
 ./build.bat     # Windows PowerShell

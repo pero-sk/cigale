@@ -16,6 +16,7 @@ fn main() {
         Some("run")     => cmd_run(&args),
         Some("new")     => cmd_new(&args),
         Some("install") => cmd_install(&args),
+        Some("fetch") => cmd_fetch(&args),
         Some("update")  => cmd_update(),
         Some("version") => cmd_version(),
         Some("help") | None => cmd_help(),
@@ -33,9 +34,10 @@ fn cmd_help() {
     println!("usage:");
     println!("  cigale run                     -- run project using build.yml");
     println!("  cigale run <file.cig>          -- run a single file");
-    println!("  cigale run <file.cig> --no-stdl -- run without stdl");
+    println!("  cigale run <file.cig> [--no-stdl] -- run without stdl");
     println!("  cigale new <project_name>      -- create a new project");
     println!("  cigale install [version]       -- install cigale");
+    println!("  cigale fetch [--global]        -- fetch dependencies from cigale.properties");
     println!("  cigale update                  -- update to latest");
     println!("  cigale version                 -- show version");
     println!("  cigale help                    -- show this help");
@@ -128,6 +130,102 @@ fn run_file(file: &str, use_stdl: bool) {
         });
 
     std::process::exit(status.code().unwrap_or(1));
+}
+
+fn cmd_fetch(args: &[String]) {
+    let global = args.iter().any(|a| a == "--global");
+
+    // find cigale.properties
+    let props_path = std::path::Path::new("cigale.properties");
+    if !props_path.exists() {
+        eprintln!("error: no cigale.properties found in current directory");
+        std::process::exit(1);
+    }
+
+    let content = match std::fs::read_to_string(props_path) {
+        Ok(s) => s,
+        Err(e) => { eprintln!("error reading cigale.properties: {}", e); std::process::exit(1); }
+    };
+
+    // parse dependencies
+    let deps = parse_properties(&content);
+    if deps.is_empty() {
+        println!("No dependencies to fetch.");
+        return;
+    }
+
+    // determine deps directory
+    let deps_dir = if global {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(home).join(".cigale").join("packages")
+    } else {
+        PathBuf::from("deps")
+    };
+
+    std::fs::create_dir_all(&deps_dir).unwrap_or_else(|e| {
+        eprintln!("error creating deps directory: {}", e);
+        std::process::exit(1);
+    });
+
+    println!("Fetching {} dependenc{}...", deps.len(), if deps.len() == 1 { "y" } else { "ies" });
+
+    for (name, url) in &deps {
+        let dep_dir = deps_dir.join(name);
+        if dep_dir.exists() {
+            println!("  [OK] {} already fetched, pulling latest...", name);
+            let status = Command::new("git")
+                .args(&["pull"])
+                .current_dir(&dep_dir)
+                .status();
+            match status {
+                Ok(s) if s.success() => println!("  [OK] {} updated", name),
+                _ => eprintln!("  [WARN] failed to update {}", name),
+            }
+        } else {
+            println!("  Fetching {}...", name);
+            let status = Command::new("git")
+                .args(&["clone", url, dep_dir.to_str().unwrap()])
+                .status();
+            match status {
+                Ok(s) if s.success() => println!("  [OK] {} fetched", name),
+                _ => {
+                    eprintln!("  [ERROR] failed to fetch {} from {}", name, url);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    println!("");
+    println!("[OK] All dependencies fetched to {}", deps_dir.display());
+}
+
+fn parse_properties(content: &str) -> Vec<(String, String)> {
+    let mut deps = Vec::new();
+    let mut in_deps = false;
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line == "[dependencies]" {
+            in_deps = true;
+            continue;
+        }
+        if line.starts_with('[') {
+            in_deps = false;
+            continue;
+        }
+        if in_deps && !line.is_empty() && !line.starts_with('#') {
+            // parse: name = "url"
+            if let Some((name, url)) = line.split_once('=') {
+                let name = name.trim().to_string();
+                let url = url.trim().trim_matches('"').to_string();
+                deps.push((name, url));
+            }
+        }
+    }
+    deps
 }
 
 fn cmd_new(args: &[String]) {
