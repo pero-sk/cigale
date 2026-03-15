@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPO_URL="https://github.com/YOUR_USERNAME/cigale"
+REPO_URL="https://github.com/pero-sk/cigale"
 INSTALL_DIR="$HOME/.cigale"
 BIN_DIR="$INSTALL_DIR/bin"
 SRC_DIR="$INSTALL_DIR/src"
@@ -50,6 +50,8 @@ add_to_path() {
 install() {
     local VERSION="$1"
 
+    local BACK_DIR="$PWD"
+
     echo "Installing Cigale..."
     check_deps
 
@@ -70,27 +72,44 @@ install() {
         cd "$SRC_DIR" && git checkout "$VERSION"
     fi
 
-    echo "Building Cigale..."
-    cd "$SRC_DIR" && cargo build --release \
-        --bin cigale_stdl \
-        --bin cigale_nostdl \
-        --bin cigale_cli
+    # Check for .noinstall file in the checked-out branch
+    if [ -f "$SRC_DIR/.noinstall" ]; then
+        echo "Error: This branch is marked as not installable (.noinstall present)."
+        echo "       Installation aborted."
+        exit 1
+    fi
 
+    echo "Building Cigale..."
+    cd "$SRC_DIR"
+
+    cargo clean
+
+    cargo build --release --bin cigale_cli --bin cigale_nostdl
+    if [ $? -ne 0 ]; then
+        echo "Build failed!"
+        exit 1
+    fi
+
+    cargo build --release --bin cigale_stdl --features="stdl"
     if [ $? -ne 0 ]; then
         echo "Build failed!"
         exit 1
     fi
 
     echo "Installing binaries..."
-    cp "$SRC_DIR/target/release/cigale_cli"    "$BIN_DIR/cigale"
     cp "$SRC_DIR/target/release/cigale_stdl"   "$BIN_DIR/cigale_stdl"
     cp "$SRC_DIR/target/release/cigale_nostdl" "$BIN_DIR/cigale_nostdl"
     cp "$SRC_DIR/cigale.sh"                    "$BIN_DIR/cigale.sh"
     cp "$SRC_DIR/cigale.bat"                   "$BIN_DIR/cigale.bat"
-    chmod +x "$BIN_DIR/cigale"
     chmod +x "$BIN_DIR/cigale_stdl"
     chmod +x "$BIN_DIR/cigale_nostdl"
     chmod +x "$BIN_DIR/cigale.sh"
+
+    # cigale itself -- copy to temp then rename (avoids file-in-use issues)
+    cp "$SRC_DIR/target/release/cigale_cli" "$BIN_DIR/cigale_new"
+    chmod +x "$BIN_DIR/cigale_new"
+    mv "$BIN_DIR/cigale_new" "$BIN_DIR/cigale"
+    echo "✓ Binaries installed"
 
     add_to_path
 
@@ -98,6 +117,9 @@ install() {
     echo "✓ Cigale installed to $BIN_DIR"
     echo "  Restart your terminal or run: source $SHELL_RC"
     echo "  Then use: cigale run <file.cig>"
+
+    cd $BACK_DIR
+    exec $SHELL
 }
 
 update() {
@@ -118,11 +140,17 @@ update() {
     fi
 
     echo "Rebuilding..."
-    cd "$SRC_DIR" && cargo build --release \
-        --bin cigale_stdl \
-        --bin cigale_nostdl \
-        --bin cigale_cli
+    cd "$SRC_DIR"
 
+    cargo clean
+
+    cargo build --release --bin cigale_cli --bin cigale_nostdl
+    if [ $? -ne 0 ]; then
+        echo "Build failed!"
+        exit 1
+    fi
+
+    cargo build --release --bin cigale_stdl --features="stdl"
     if [ $? -ne 0 ]; then
         echo "Build failed!"
         exit 1
