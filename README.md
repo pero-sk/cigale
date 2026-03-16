@@ -8,6 +8,8 @@ would pass analysis.~~ this issue specifically was fixed. This will change upon 
 
 # Cigale
 
+[VCS extension now available!](https://marketplace.visualstudio.com/items?itemName=pero-sk.cigale)
+
 A statically-typed, interpreted programming language built in Rust.
 
 ```
