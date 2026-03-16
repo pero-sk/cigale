@@ -18,7 +18,7 @@ import stdl.console { cout };
 func public static main() {
     cout("Hello, world!");
 }
-```
+``` 
 
 ---
 
@@ -433,8 +433,6 @@ cout(name);         // project name or null
 cout(description);  // project description or null
 ```
 
-not implemented as of 0.2.5, check back in the next version.
-
 ---
 
 ## Project Structure
@@ -456,8 +454,6 @@ version = "1.0.0";
 ```
 
 Without a project structure, `.cig` files can still be run directly via the interpreter.
-
-project.cfg is useless as of 0.2.5, because it isn't used without stdl.project which isn't implemented.
 
 use `cigale new <project_name>` to setup a basic project structure.
 
