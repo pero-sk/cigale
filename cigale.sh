@@ -70,6 +70,9 @@ install() {
     if [ -n "$VERSION" ]; then
         echo "Checking out version $VERSION..."
         cd "$SRC_DIR" && git checkout "$VERSION"
+    else
+        echo "Checking out latest..."
+        cd "$SRC_DIR" && git checkout latest
     fi
 
     # Check for .noinstall file in the checked-out branch
