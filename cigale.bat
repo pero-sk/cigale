@@ -88,12 +88,12 @@ goto help
         git checkout %2
         if %errorlevel% neq 0 ( echo Failed to checkout %2! & exit /b 1 )
     ) else (
-        echo Checking out master...
-        git checkout master
-        if %errorlevel% neq 0 ( echo Failed to checkout master! & exit /b 1 )
+        echo Checking out latest...
+        git checkout latest
+        if %errorlevel% neq 0 ( echo Failed to checkout latest! & exit /b 1 )
 
-        git reset --hard origin/master
-        if %errorlevel% neq 0 ( echo Failed to reset master! & exit /b 1 )
+        git reset --hard origin/latest
+        if %errorlevel% neq 0 ( echo Failed to reset latest! & exit /b 1 )
     )
 
     :: Check for .noinstall file in the checked-out branch
