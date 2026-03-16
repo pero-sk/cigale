@@ -86,21 +86,10 @@ goto help
     if not "%2"=="" (
         echo Checking out version %2...
         git checkout %2
-        if %errorlevel% neq 0 ( echo Failed to checkout %2! & exit /b 1 )
-    ) else (
-        echo Checking out latest...
-        git checkout latest
-        if %errorlevel% neq 0 ( echo Failed to checkout latest! & exit /b 1 )
-
-        git reset --hard origin/latest
-        if %errorlevel% neq 0 ( echo Failed to reset latest! & exit /b 1 )
-    )
-
-    :: Check for .noinstall file in the checked-out branch
-    if exist "%SRC_DIR%\.noinstall" (
-        echo Error: This branch is marked as not installable ^(.noinstall present^).
-        echo        Installation aborted.
-        exit /b 1
+        if %errorlevel% neq 0 (
+            echo Failed to checkout version %2!
+            exit /b 1
+        )
     )
 
     echo Building Cigale...
