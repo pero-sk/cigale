@@ -1276,6 +1276,7 @@ impl Interpreter {
                             let ch = s.chars().nth(*val as usize).unwrap();
                             Ok(Value::Str(ch.to_string()))
                         },
+                        "len" => Ok(Value::Int(s.chars().count() as i64)),
                         _ => Err(format!("str has no method {}", method)),
                     }
                 }
