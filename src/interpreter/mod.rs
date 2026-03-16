@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 #[cfg(feature = "stdl")]
 use std::collections::HashSet;
+use std::fmt::format;
 #[cfg(feature = "stdl")]
 use std::sync::Mutex;
 use crate::analyser::type_to_str;
@@ -1121,168 +1122,270 @@ impl Interpreter {
         Ok(return_val)
     }
 
-   pub fn eval_method_call(&mut self, object: Expr, method: String, args: Vec<Expr>) -> Result<Value, String> {
-        // evaluate args
-        let mut arg_vals = Vec::new();
-        for arg in args {
-            arg_vals.push(self.eval_expr(arg)?);
-        }
-        let obj_val = self.eval_expr(object)?;
+    pub fn eval_method_call(&mut self, object: Expr, method: String, args: Vec<Expr>) -> Result<Value, String> {
+            // evaluate args
+            let mut arg_vals = Vec::new();
+            for arg in args {
+                arg_vals.push(self.eval_expr(arg)?);
+            }
+            let obj_val = self.eval_expr(object.clone())?;
 
-        match obj_val {
-            Value::ResultVal { val, err } => {
-                match method.as_str() {
-                    "get" => {
-                        if !matches!(*err, Value::Null) {
-                            return Err("called get() on error result".to_string());
+            match obj_val {
+                Value::ResultVal { val, err } => {
+                    match method.as_str() {
+                        "get" => {
+                            if !matches!(*err, Value::Null) {
+                                return Err("called get() on error result".to_string());
+                            }
+                            Ok(*val)
                         }
-                        Ok(*val)
-                    }
 
-                    "error" => {
-                        if matches!(*err, Value::Null) {
-                            Ok(Value::Null)
-                        } else {
-                            Ok(*err)
+                        "error" => {
+                            if matches!(*err, Value::Null) {
+                                Ok(Value::Null)
+                            } else {
+                                Ok(*err)
+                            }
+                        }
+
+                        "is_ok" => Ok(Value::Bool(matches!(*err, Value::Null))),
+                        "is_err" => Ok(Value::Bool(!matches!(*err, Value::Null))),
+
+                        _ => Err(format!("result has no method {}", method)),
+                    }
+                }
+                // enum variant -- cannot call methods on it
+                Value::EnumVariant(enum_name, _) => {
+                    Err(format!("cannot call method {} on enum variant {}", method, enum_name))
+                }
+                Value::NativeHandle(handle) => {
+                    #[cfg(feature = "stdl")]
+                    match handle {
+                        NativeHandle::File(h) => {
+                            crate::stdl::io::file_method(h, &method, arg_vals)
                         }
                     }
-
-                    "is_ok" => Ok(Value::Bool(matches!(*err, Value::Null))),
-                    "is_err" => Ok(Value::Bool(!matches!(*err, Value::Null))),
-
-                    _ => Err(format!("result has no method {}", method)),
+                    #[cfg(not(feature = "stdl"))]
+                    Err("native handles require stdl feature".to_string())
                 }
-            }
-
-            // enum variant -- cannot call methods on it
-            Value::EnumVariant(enum_name, _) => {
-                Err(format!("cannot call method {} on enum variant {}", method, enum_name))
-            }
-
-            Value::NativeHandle(handle) => {
-                #[cfg(feature = "stdl")]
-                match handle {
-                    NativeHandle::File(h) => {
-                        crate::stdl::io::file_method(h, &method, arg_vals)
+                // Error instance field access
+                Value::Instance { ref class_name, ref fields, .. } if class_name == "Error" => {
+                    match method.as_str() {
+                        "msg" => Ok(fields.get("msg").cloned().unwrap_or(Value::Null)),
+                        _ => self.eval_instance_method(&object, obj_val, method, arg_vals),
                     }
                 }
-                #[cfg(not(feature = "stdl"))]
-                Err("native handles require stdl feature".to_string())
-            }
-
-            // Error instance field access
-            Value::Instance { ref class_name, ref fields, .. } if class_name == "Error" => {
-                match method.as_str() {
-                    "msg" => Ok(fields.get("msg").cloned().unwrap_or(Value::Null)),
-                    _ => self.eval_instance_method(obj_val.clone(), method, arg_vals),
-                }
-            }
-
-            // enum access: colour.RED
-            Value::Identifier(enum_name) => {
-                match self.enums.get(&enum_name) {
-                    Some(variants) if variants.contains(&method) => {
-                        Ok(Value::EnumVariant(enum_name, method))
+                // enum access: colour.RED
+                Value::Identifier(enum_name) => {
+                    match self.enums.get(&enum_name) {
+                        Some(variants) if variants.contains(&method) => {
+                            Ok(Value::EnumVariant(enum_name, method))
+                        }
+                        _ => Err(format!("no variant {} on {}", method, enum_name)),
                     }
-                    _ => Err(format!("no variant {} on {}", method, enum_name)),
                 }
-            }
-
-            // general instance method call
-            Value::Instance { .. } => {
-                self.eval_instance_method(obj_val, method, arg_vals)
-            }
-
-            _ => Err(format!("cannot call method {} on {:?}", method, obj_val)),
-        }
-    }
-
-   pub fn eval_instance_method(&mut self, obj: Value, method: String, args: Vec<Value>) -> Result<Value, String> {
-        match obj {
-                Value::Instance { class_name, fields, .. } => {
-                    // check for field access first (no args, field exists)
-                    if args.is_empty() {
-                        if let Some(val) = fields.get(&method) {
-                            match val.clone() {
-                                Value::Function(_) => {
-                                    // it's a method stored as a function, call it with fields in scope
+                // general instance method call
+                Value::Instance { .. } => {
+                    self.eval_instance_method(&object, obj_val, method, arg_vals)
+                }
+                Value::List(items) => {
+                    match method.as_str() {
+                        "len" => Ok(Value::Int(items.len() as i64)),
+                        "first" => Ok(items.first().cloned().unwrap_or(Value::Null)),
+                        "last"  => Ok(items.last().cloned().unwrap_or(Value::Null)),
+                        "contains" => {
+                            let val = arg_vals.into_iter().next().unwrap_or(Value::Null);
+                            Ok(Value::Bool(items.iter().any(|v| self.values_equal(v, &val))))
+                        }
+                        "push" | "pop" | "remove" | "reverse" | "insert" => {
+                            // these mutate -- need identifier to write back
+                            match object {
+                                Expr::Identifier(var_name) => {
+                                    let mut list = match self.env.get(&var_name) {
+                                        Some(Value::List(l)) => l.clone(),
+                                        _ => return Err(format!("'{}' is not a list", var_name)),
+                                    };
+                                    match method.as_str() {
+                                        "push" => {
+                                            let val = arg_vals.into_iter().next().unwrap_or(Value::Null);
+                                            list.push(val);
+                                            self.env.assign(&var_name, Value::List(list));
+                                            Ok(Value::Null)
+                                        }
+                                        "pop" => {
+                                            let val = list.pop().unwrap_or(Value::Null);
+                                            self.env.assign(&var_name, Value::List(list));
+                                            Ok(val)
+                                        }
+                                        "remove" => {
+                                            let idx = match arg_vals.first() {
+                                                Some(Value::Int(i)) => *i as usize,
+                                                _ => return Err("remove() requires an int index".to_string()),
+                                            };
+                                            if idx >= list.len() {
+                                                return Err(format!("index {} out of bounds", idx));
+                                            }
+                                            let val = list.remove(idx);
+                                            self.env.assign(&var_name, Value::List(list));
+                                            Ok(val)
+                                        }
+                                        "reverse" => {
+                                            list.reverse();
+                                            self.env.assign(&var_name, Value::List(list));
+                                            Ok(Value::Null)
+                                        }
+                                        "insert" => {
+                                            let idx = match arg_vals.get(0) {
+                                                Some(Value::Int(i)) => *i as usize,
+                                                _ => return Err("insert() requires an int index".to_string()),
+                                            };
+                                            let val = arg_vals.into_iter().nth(1).unwrap_or(Value::Null);
+                                            if idx > list.len() {
+                                                return Err(format!("index {} out of bounds", idx));
+                                            }
+                                            list.insert(idx, val);
+                                            self.env.assign(&var_name, Value::List(list));
+                                            Ok(Value::Null)
+                                        }
+                                        _ => unreachable!()
+                                    }
                                 }
-                                v => return Ok(v), // it's a plain field value
+                                _ => Err(format!("cannot call mutating method '{}' on a non-variable list", method)),
                             }
                         }
+                        _ => Err(format!("list has no method {}", method)),
                     }
-
-                    // look up method in class definition
-                    let class = self.classes.get(&class_name)
-                        .ok_or_else(|| format!("undefined class {}", class_name))?
-                        .clone();
-                    let func = class.body.iter()
-                        .find(|f| f.name == method)
-                        .ok_or_else(|| format!("class {} has no method {}", class_name, method))?
-                        .clone();
-
-                    // validate arg count
-                    if args.len() != func.params.len() {
-                        return Err(format!(
-                            "method {} expects {} args but got {}",
-                            func.name, func.params.len(), args.len()
-                        ));
-                    }
-
-                    // create new scope
-                    let old_env = std::mem::replace(&mut self.env, Environment::new());
-                    self.env = Environment::new_child(old_env);
-
-                    // bind fields FIRST so methods can access them
-                    for (k, v) in &fields {
-                        self.env.set(k, v.clone());
-                    }
-
-                    // then bind params on top
-                    for (param, val) in func.params.iter().zip(args.into_iter()) {
-                        self.env.set(&param.name, val);
-                    }
-
-                    // execute body
-                    let body = match func.body {
-                        Some(b) => b,
-                        None => {
-                            let child = std::mem::replace(&mut self.env, Environment::new());
-                            self.env = *child.parent.unwrap();
-                            return Err(format!("cannot call blank method {}", func.name));
-                        }
-                    };
-
-                    let mut return_val = Value::Null;
-                    for stmt in body {
-                        match self.exec_stmt(stmt) {
-                            Ok(_) => {}
-                            Err(ExecError::Signal(Signal::Return(val))) => {
-                                return_val = val;
-                                break;
-                            }
-                            Err(ExecError::Error(e)) => {
-                                let child = std::mem::replace(&mut self.env, Environment::new());
-                                self.env = *child.parent.unwrap();
-                                return Err(e);
-                            }
-                            Err(ExecError::Signal(s)) => {
-                                let child = std::mem::replace(&mut self.env, Environment::new());
-                                self.env = *child.parent.unwrap();
-                                return Err(format!("unexpected signal {:?} in method body", s));
-                            }
-                        }
-                    }
-
-                    // restore env
-                    let child = std::mem::replace(&mut self.env, Environment::new());
-                    self.env = *child.parent.unwrap();
-
-                    Ok(return_val)
                 }
-                _ => Err(format!("cannot call method {} on non-instance", method)),
+                Value::Str(s) => {
+                    match method.as_str() {
+                        "join" => {
+                            let val = match arg_vals.get(0) {
+                                Some(Value::Str(st)) => st,
+                                _ => return Err("join() requires a string".to_string()),
+                            };
+
+                            Ok(Value::Str(s + val))
+                        },
+                        "index" => {
+                            let val = match arg_vals.get(0) {
+                                Some(Value::Int( int )) => int,
+                                _ => return Err("index() requires an int index".to_string())
+                            };
+                            if *val as usize > s.len() - 1 {
+                                return Err(format!("index {} out of bounds", val));
+                            }
+                            let ch = s.chars().nth(*val as usize).unwrap();
+                            Ok(Value::Str(ch.to_string()))
+                        },
+                        _ => Err(format!("str has no method {}", method)),
+                    }
+                }
+                _ => Err(format!("cannot call method {} on {:?}", method, obj_val)),
             }
         }
+
+    pub fn eval_instance_method(&mut self, object: &Expr, obj: Value, method: String, args: Vec<Value>) -> Result<Value, String> {
+            let obj_clone = obj.clone();
+            match obj {
+                    Value::Instance { class_name, fields, parent } => {
+                        // check for field access first (no args, field exists)
+                        if args.is_empty() {
+                            if let Some(val) = fields.get(&method) {
+                                match val.clone() {
+                                    Value::Function(_) => {
+                                        // it's a method stored as a function, call it with fields in scope
+                                    }
+                                    v => return Ok(v), // it's a plain field value
+                                }
+                            }
+                        }
+
+                        // look up method in class definition
+                        let class = self.classes.get(&class_name)
+                            .ok_or_else(|| format!("undefined class {}", class_name))?
+                            .clone();
+                        let func = class.body.iter()
+                            .find(|f| f.name == method)
+                            .ok_or_else(|| format!("class {} has no method {}", class_name, method))?
+                            .clone();
+
+                        // validate arg count
+                        if args.len() != func.params.len() {
+                            return Err(format!(
+                                "method {} expects {} args but got {}",
+                                func.name, func.params.len(), args.len()
+                            ));
+                        }
+
+                        // create new scope
+                        let old_env = std::mem::replace(&mut self.env, Environment::new());
+                        self.env = Environment::new_child(old_env);
+
+                        // bind fields FIRST so methods can access them
+                        for (k, v) in &fields {
+                            self.env.set(k, v.clone());
+                        }
+
+                        // then bind params on top
+                        for (param, val) in func.params.iter().zip(args.into_iter()) {
+                            self.env.set(&param.name, val);
+                        }
+
+                        // execute body
+                        let body = match func.body {
+                            Some(b) => b,
+                            None => {
+                                let child = std::mem::replace(&mut self.env, Environment::new());
+                                self.env = *child.parent.unwrap();
+                                return Err(format!("cannot call blank method {}", func.name));
+                            }
+                        };
+
+                        let mut return_val = Value::Null;
+                        for stmt in body {
+                            match self.exec_stmt(stmt) {
+                                Ok(_) => {}
+                                Err(ExecError::Signal(Signal::Return(val))) => {
+                                    return_val = val;
+                                    break;
+                                }
+                                Err(ExecError::Error(e)) => {
+                                    let child = std::mem::replace(&mut self.env, Environment::new());
+                                    self.env = *child.parent.unwrap();
+                                    return Err(e);
+                                }
+                                Err(ExecError::Signal(s)) => {
+                                    let child = std::mem::replace(&mut self.env, Environment::new());
+                                    self.env = *child.parent.unwrap();
+                                    return Err(format!("unexpected signal {:?} in method body", s));
+                                }
+                            }
+                        }
+
+                        let mut updated_fields = fields.clone();
+                        for key in updated_fields.keys().cloned().collect::<Vec<_>>() {
+                            if let Some(new_val) = self.env.get(&key) {
+                                updated_fields.insert(key, new_val.clone());
+                            }
+                        }
+
+                        if let Expr::Identifier(var_name) = object {
+                            self.env.assign(var_name, Value::Instance {
+                                class_name: class_name.clone(),
+                                fields: updated_fields,
+                                parent,
+                            });
+                        }
+
+                        // restore env
+                        let child = std::mem::replace(&mut self.env, Environment::new());
+                        self.env = *child.parent.unwrap();
+
+                        Ok(return_val)
+                    }
+                    _ => Err(format!("cannot call method {} on non-instance", method)),
+                }
+            }
 
         fn coerce_to_type(&self, val: Value, ty: &Type) -> Result<Value, String> {
             match (val, ty) {
