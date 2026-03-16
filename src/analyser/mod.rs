@@ -1,6 +1,5 @@
-// analyser/mod.rs
 use crate::parser::ast::*;
-use std::{collections::HashMap};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub enum AnalysisError {
@@ -12,13 +11,15 @@ pub struct Analyser {
     // variable name -> type
     vars: HashMap<String, Type>,
     // function name -> (param_types, return_type)
-    functions: HashMap<String, (Vec<Type>, Option<Type>)>,
+    functions: HashMap<String, (Vec<Type>, Option<Type>, bool)>,
     // class name -> ClassDecl
     classes: HashMap<String, ClassDecl>,
     // enum name -> variants
     enums: HashMap<String, Vec<String>>,
     errors: Vec<AnalysisError>,
     current_class: Option<String>,
+    in_static_context: bool,
+    static_vars: HashSet<String>
 }
 
 impl Analyser {
@@ -30,6 +31,8 @@ impl Analyser {
             enums: HashMap::new(),
             errors: Vec::new(),
             current_class: None,
+            in_static_context: false,
+            static_vars: HashSet::new(),
         }
     }
 
@@ -40,7 +43,7 @@ impl Analyser {
                 Stmt::FunctionDeclaration(f) => {
                     self.functions.insert(
                         f.name.clone(),
-                        (f.param_types.clone(), f.return_type.clone())
+                        (f.param_types.clone(), f.return_type.clone(), f.modifiers.is_static)
                     );
                 }
                 Stmt::ClassDeclaration(c) => {
@@ -61,7 +64,12 @@ impl Analyser {
 
     fn analyse_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::VariableDeclaration { name, ty, value, .. } => {
+            Stmt::VariableDeclaration { name, ty, value, is_static, .. } => {
+                let prev = self.in_static_context;
+                if *is_static {
+                    self.static_vars.insert(name.clone());
+                    self.in_static_context = true;
+                }
                 if let (Some(ty), Some(expr)) = (ty, value) {
                     if let Some(expr_ty) = self.infer_type(expr) {
                         if !self.types_compatible(ty, &expr_ty) {
@@ -75,9 +83,15 @@ impl Analyser {
                 if let Some(ty) = ty {
                     self.vars.insert(name.clone(), ty.clone());
                 }
+                self.in_static_context = prev;
             }
             Stmt::FunctionDeclaration(f) => {
+                let prev = self.in_static_context;
+                if f.modifiers.is_static {
+                    self.in_static_context = true;
+                }
                 self.analyse_function(f);
+                self.in_static_context = prev;
             }
             Stmt::ClassDeclaration(c) => {
                 self.analyse_class(c);
@@ -119,7 +133,12 @@ impl Analyser {
                 self.analyse_expr(expr);
             }
             Stmt::StaticBlock(stmts) => {
-                for stmt in stmts { self.analyse_stmt(stmt); }
+                let prev = self.in_static_context;
+                self.in_static_context = true;
+                for stmt in stmts {
+                    self.analyse_stmt(stmt);
+                }
+                self.in_static_context = prev;
             }
             Stmt::MatchStatement { value, arms } => {
                 self.analyse_expr(value);
@@ -161,7 +180,9 @@ impl Analyser {
 
     fn analyse_class(&mut self, c: &ClassDecl) {
         let previous = self.current_class.clone();
+        let previous_static = self.in_static_context; // save
         self.current_class = Some(c.name.clone());
+        self.in_static_context = true;
 
         for method in &c.body {
             // func blank only in class inst
@@ -210,6 +231,7 @@ impl Analyser {
         }
 
         self.current_class = previous;
+        self.in_static_context = previous_static;
     }
 
     fn analyse_expr(&mut self, expr: &Expr) {
@@ -217,6 +239,13 @@ impl Analyser {
             Expr::MethodCall { object, method, args } => {
                 if let Some(obj_ty) = self.infer_type(object) {
                     if let Type::UserType(class_name) = &obj_ty {
+                        if self.classes.contains_key(class_name.as_str()) && !self.in_static_context {
+                            self.errors.push(AnalysisError::Error(format!(
+                                "cannot access class '{}' outside of a static context",
+                                class_name
+                            )));
+                        }
+
                         if let Some(class) = self.classes.get(class_name).cloned() {
                             // check method access
                             if let Some(func) = class.body.iter().find(|f| f.name == *method) {
@@ -296,11 +325,26 @@ impl Analyser {
                 for arg in args { self.analyse_expr(arg); }
             }
 
-            Expr::Identifier( .. ) => {}
+            Expr::Identifier(name) => {
+                // check if static variable used outside static context
+                if self.static_vars.contains(name) && !self.in_static_context {
+                    self.errors.push(AnalysisError::Error(format!(
+                        "cannot access static variable '{}' outside of a static context",
+                        name
+                    )));
+                }
+            }
             Expr::Literal( .. ) => {}
 
             Expr::FunctionCall { name, args } => {
-                if let Some((param_types, _)) = self.functions.get(name).cloned() {
+                if let Some((param_types, _, is_static)) = self.functions.get(name).cloned() {
+                    if is_static && !self.in_static_context {
+                        self.errors.push(AnalysisError::Error(format!(
+                            "cannot call static function '{}' outside of a static context",
+                            name
+                        )));
+                    }
+
                     // check arg count
                     if args.len() != param_types.len() {
                         self.errors.push(AnalysisError::Error(format!(
@@ -404,6 +448,17 @@ impl Analyser {
                     }
                 }
                 Some(to.clone())
+            }
+            Expr::FunctionCall { name, args: _ } => {
+                // if it's a class instantiation, return UserType
+                if self.classes.contains_key(name.as_str()) {
+                    return Some(Type::UserType(name.clone()));
+                }
+                // if it's a known function, return its return type
+                if let Some((_, ret_ty, _)) = self.functions.get(name) {
+                    return ret_ty.clone();
+                }
+                None
             }
             _ => None,
         }

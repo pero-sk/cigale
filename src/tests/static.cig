@@ -1,0 +1,23 @@
+import stdl.console { cout };
+
+static int x = 5;
+class maths {
+    func public add<int, int>(a, b) { return a + b; }
+}
+func public static main() {
+    cout(x<str>);           // ✅ static function accessing static var
+}
+static {
+    int y = 5;              // ✅ static block
+}
+cout(x<str>);               // ❌ should err -- global non-static context
+static { cout(x<str>); }    // ✅ static global context
+func public smain() {
+    cout(x<str>);           // ❌ should err -- non-static function
+}
+class mathematics {
+    int z = 5;              // ✅ class fields are static
+}
+
+maths().add(1, 2);          // ❌ should err -- global non-static context
+static{ maths().add(1, 2); }//✅ static global context

@@ -1,6 +1,0 @@
-import stdl.console { couts };
-
-
-func public static main() {
-    list<str|int> x = ["one", 2, 3.0f];
-}
