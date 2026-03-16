@@ -19,7 +19,7 @@ pub fn handle(module: &[String], function: &str, args: Vec<Value>) -> Option<Res
         Some("funct")   => err::funct::handle(function, args),
         Some("maths")   => maths::handle(function, args),
         Some("json")    => json::handle(function, args),
-        // Some("project") => project::handle(function, args),
+        Some("project") => project::handle(function, args),
         _ => None,
     }
 }
@@ -27,7 +27,7 @@ pub fn handle(module: &[String], function: &str, args: Vec<Value>) -> Option<Res
 pub fn get_value(module: &[String], name: &str) -> Option<Value> {
     match module.last().map(|s| s.as_str()) {
         Some("maths")   => maths::get_value(name),
-        // Some("project") => project::get_value(name),
+        Some("project") => project::get_value(name),
         _ => None,
     }
 }

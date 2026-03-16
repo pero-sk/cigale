@@ -1,0 +1,8 @@
+import stdl.project { name, description, version };
+import stdl.console { cout };
+
+func public static main() {
+    cout(name);
+    cout(description);
+    cout(version);
+}
