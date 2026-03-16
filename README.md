@@ -1,11 +1,3 @@
-## problems
-
-~~enums don't work (parser issue, possibly interpreter too)~~ Enums have worked, the parser was being buggy as a one-time thing, aka I didn't do anything but they work!
-
-analyser doesn't cover every single possible error, ~~such as this which was discovered:
-```list<str|int> mixed = ["hello", 1, 2.0f];```
-would pass analysis.~~ this issue specifically was fixed. This will change upon new analyser issues.
-
 # Cigale
 
 [VCS extension now available!](https://marketplace.visualstudio.com/items?itemName=pero-sk.cigale)
