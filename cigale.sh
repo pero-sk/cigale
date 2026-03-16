@@ -82,6 +82,13 @@ install() {
         exit 1
     fi
 
+    # Check for .noinstall file in the checked-out branch
+    if [ -f "$SRC_DIR/.noinstall" ]; then
+        echo "Error: This branch is marked as not installable (.noinstall present)."
+        echo "       Installation aborted."
+        exit 1
+    fi
+
     echo "Building Cigale..."
     cd "$SRC_DIR"
 
