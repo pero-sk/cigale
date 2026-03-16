@@ -215,7 +215,6 @@ impl Analyser {
     fn analyse_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::MethodCall { object, method, args } => {
-                let obj_ty = self.infer_type(object);
                 if let Some(obj_ty) = self.infer_type(object) {
                     if let Type::UserType(class_name) = &obj_ty {
                         if let Some(class) = self.classes.get(class_name).cloned() {

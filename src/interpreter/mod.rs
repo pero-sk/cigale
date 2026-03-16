@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 #[cfg(feature = "stdl")]
 use std::collections::HashSet;
-use std::fmt::format;
 #[cfg(feature = "stdl")]
 use std::sync::Mutex;
 use crate::analyser::type_to_str;
@@ -1285,7 +1284,6 @@ impl Interpreter {
         }
 
     pub fn eval_instance_method(&mut self, object: &Expr, obj: Value, method: String, args: Vec<Value>) -> Result<Value, String> {
-            let obj_clone = obj.clone();
             match obj {
                     Value::Instance { class_name, fields, parent } => {
                         // check for field access first (no args, field exists)
