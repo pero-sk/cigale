@@ -145,6 +145,7 @@ impl Lexer {
             "float"     => Token::Float,
             "double"    => Token::Double,
             "str"       => Token::Str,
+            "ref"       => Token::Ref,
             "bool"      => Token::Bool,
             "func"      => Token::Func,
             "class"     => Token::Class,

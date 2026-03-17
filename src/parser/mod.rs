@@ -70,7 +70,7 @@ impl Parser {
             // primitive type keywords -> variable declaration
             Some(Token::Int)    | Some(Token::Float) |
             Some(Token::Double) | Some(Token::Str)   |
-            Some(Token::Bool)   => self.parse_variable_decl(),
+            Some(Token::Bool)   | Some(Token::Ref)   => self.parse_variable_decl(),
             // identifier -> could be variable declaration (user type) or expression
             Some(Token::Identifier(_)) => {
                 // peek ahead to detect: TypeName varName = ...
@@ -435,6 +435,24 @@ impl Parser {
             Some(Token::Double) => { self.advance(); Ok(Type::Double) }
             Some(Token::Str)    => { self.advance(); Ok(Type::Str) }
             Some(Token::Bool)   => { self.advance(); Ok(Type::Bool) }
+            Some(Token::Ref) => {
+                self.advance();
+                self.expect(&Token::Lesser, "parse_type::ref::langle")?;
+                let inner = self.parse_type()?;
+                // handle >> being tokenized as RBS instead of two >
+                match self.current() {
+                    Some(Token::Greater) => { self.advance(); }
+                    Some(Token::RBS) => {
+                        // split >> into two > -- consume one and leave the other
+                        // replace RBS with Greater at current position
+                        self.tokens[self.pos] = Token::Greater;
+                        // self.advance();
+                    }
+                    Some(t) => return Err(format!("[parse_type::ref::rangle] expected Greater but got {:?}", t)),
+                    None => return Err("expected > but got EOF".to_string()),
+                }
+                Ok(Type::Ref(Box::new(inner)))
+            }
             Some(Token::Identifier(n)) => {
                 let n = n.clone();
                 self.advance();
@@ -987,6 +1005,16 @@ impl Parser {
                 self.advance();
                 let expr = self.parse_unary()?;
                 Ok(Expr::UnaryExpr { op: UnaryOp::Neg, expr: Box::new(expr) })
+            }
+            Some(Token::AND) => {
+                self.advance();
+                let expr = self.parse_unary()?;
+                Ok(Expr::RefExpr(Box::new(expr)))
+            }
+            Some(Token::Star) => {
+                self.advance();
+                let expr = self.parse_unary()?;
+                Ok(Expr::DerefExpr(Box::new(expr)))
             }
             _ => self.parse_postfix()
         }

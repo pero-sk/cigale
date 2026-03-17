@@ -1,0 +1,12 @@
+import stdl.console { cout };
+
+static {
+    ref<int> dangling = null;
+    static {
+        int b = 10;
+        dangling = &b;
+    }
+    cout((*dangling)<str>);
+}
+
+func public static main() { }

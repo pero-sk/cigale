@@ -19,6 +19,7 @@ pub enum Type {
     List(Option<Vec<Type>>),    // list or list<str|int>
     UserType(String),           // class inst types
     Generic(String),            // T, U, V etc.
+    Ref(Box<Type>),             // ref<T> type
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +77,9 @@ pub enum Expr {
         ty: Type,
         expr: Box<Expr>,
     },
+    
+    RefExpr(Box<Expr>),
+    DerefExpr(Box<Expr>),
 }
 
 #[derive(Debug, Clone)]

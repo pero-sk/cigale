@@ -392,6 +392,15 @@ impl Analyser {
                     }
                 }
             }
+            Expr::IndexExpr {..} => {}
+
+            Expr::RefExpr(expr) => {
+                self.analyse_expr(expr.as_ref());
+            }
+            Expr::DerefExpr(expr) => {
+                self.analyse_expr(expr.as_ref());
+            }
+
             _ => {println!("Warning: undefined analysis behaviour for: {}", expr_to_str(expr))}
         }
     }
@@ -496,6 +505,7 @@ impl Analyser {
             (Type::Float,  Type::Int)    => true,
             (Type::Double, Type::Int)    => true,
             (Type::Double, Type::Float)  => true,
+            (Type::Ref(_), Type::Ref(_)) => true,
             // untyped list compatible with any list
             (Type::List(_), Type::List(None)) => true,
             (Type::List(None), Type::List(_)) => true,
@@ -576,6 +586,7 @@ pub fn type_to_str(ty: &Type) -> String {
         }
         Type::UserType(n)      => n.clone(),
         Type::Generic(n)       => n.clone(),
+        Type::Ref( .. ) => "ref".to_string(),
     }
 }
 

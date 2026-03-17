@@ -12,6 +12,7 @@ pub enum Token {
     Int,
     Float,
     Double,
+    Ref,
     Str,
     Bool,
     // keywords -- functions/classes

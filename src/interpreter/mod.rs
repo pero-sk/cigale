@@ -1,6 +1,9 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 #[cfg(feature = "stdl")]
 use std::collections::HashSet;
+use std::ops::Deref;
+use std::rc::Rc;
 #[cfg(feature = "stdl")]
 use std::sync::Mutex;
 use crate::analyser::type_to_str;
@@ -110,6 +113,7 @@ pub enum Value {
     NativeHandle(NativeHandle),
     Function(FunctionDecl),
     Identifier(String),
+    Ref(std::rc::Rc<std::cell::RefCell<Value>>),
     Null,
 }
 
@@ -120,6 +124,7 @@ struct Environment {
 pub struct Interpreter {
     env: Environment,
     classes: HashMap<String, ClassDecl>,
+    refs: HashMap<String, Rc<RefCell<Value>>>,
     enums: HashMap<String, Vec<String>>,  // name -> variants
     pub base_dir: String,
     #[cfg(feature = "stdl")]
@@ -173,6 +178,7 @@ impl Interpreter {
         Interpreter {
             env: Environment::new(),
             classes: HashMap::new(),
+            refs: HashMap::new(),
             enums: HashMap::new(),
             base_dir: ".".to_string(),
             #[cfg(feature = "stdl")]
@@ -583,6 +589,31 @@ impl Interpreter {
                 Literal::Null      => Value::Null,
             }),
 
+            Expr::RefExpr(expr) => {
+                match *expr {
+                    Expr::Identifier(name) => {
+                        // get current value
+                        let val = self.env.get(&name)
+                            .ok_or_else(|| format!("undefined variable: {}", name))?
+                            .clone();
+                        // create shared Rc
+                        let rc = Rc::new(RefCell::new(val));
+                        // register so future assignments to 'a' update the Rc
+                        self.refs.insert(name, rc.clone());
+                        Ok(Value::Ref(rc))
+                    }
+                    _ => Err("& operator requires a variable".to_string()),
+                }
+            }
+
+            Expr::DerefExpr(expr) => {
+                let val = self.eval_expr(*expr)?;
+                match val {
+                    Value::Ref(rc) => Ok(rc.borrow().clone()),
+                    _ => Err("* operator requires a ref".to_string()),
+                }
+            }
+
             Expr::Identifier(name) => {
                 // check env first
                 if let Some(v) = self.env.get(&name) {
@@ -683,6 +714,7 @@ impl Interpreter {
             Value::Float(f)  => f.to_string(),
             Value::Double(d) => d.to_string(),
             Value::Str(s)    => s.clone(),
+            Value::Ref(r)=> format!("ref({})", self.value_to_str(&r.borrow())),
             Value::Bool(b)   => b.to_string(),
             Value::Null      => "null".to_string(),
             Value::EnumVariant(e, v) => format!("{}.{}", e, v),
@@ -774,17 +806,45 @@ impl Interpreter {
         }
     }
 
-   pub fn eval_binary(&mut self, left: Expr, op: BinaryOp, right: Expr) -> Result<Value, String> {
+    pub fn eval_binary(&mut self, left: Expr, op: BinaryOp, right: Expr) -> Result<Value, String> {
         // handle assignment ops first before evaluating left
         match op {
             BinaryOp::Assign => {
                 let val = self.eval_expr(right)?;
                 match left {
                     Expr::Identifier(name) => {
+                        // update ref registry if one exists for this variable
+                        if let Some(rc) = self.refs.get(&name).cloned() {
+                            *rc.borrow_mut() = val.clone();
+                        }
                         if !self.env.assign(&name, val.clone()) {
                             return Err(format!("undefined variable: {}", name));
                         }
                         return Ok(val);
+                    }
+                    Expr::DerefExpr(inner) => {
+                        match *inner {
+                            Expr::Identifier(name) => {
+                                let ref_val = self.env.get(&name)
+                                    .ok_or_else(|| format!("undefined variable: {}", name))?
+                                    .clone();
+                                match ref_val {
+                                    Value::Ref(rc) => {
+                                        *rc.borrow_mut() = val.clone();
+                                        // update original variable in env
+                                        for (var_name, var_rc) in &self.refs {
+                                            if Rc::ptr_eq(var_rc, &rc) {
+                                                self.env.assign(var_name, val.clone());
+                                                break;
+                                            }
+                                        }
+                                        return Ok(val);
+                                    }
+                                    _ => return Err(format!("{} is not a ref", name)),
+                                }
+                            }
+                            _ => return Err("cannot deref non-identifier".to_string()),
+                        }
                     }
                     Expr::IndexExpr { object, index } => {
                         let idx = self.eval_expr(*index)?;
@@ -1415,5 +1475,6 @@ fn value_to_str(ty: &Value) -> String {
         Value::Function( .. ) => "function".to_string(),
         Value::Identifier( .. ) => "identifier".to_string(),
         Value::Null => "null".to_string(),
+        Value::Ref( .. ) => "ref".to_string(),
     }
 }

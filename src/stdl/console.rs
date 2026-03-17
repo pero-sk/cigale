@@ -63,6 +63,12 @@ fn value_to_str(args: Vec<Value>) -> Result<Value, String> {
         Value::Str(s)    => s.clone(),
         Value::Bool(b)   => b.to_string(),
         Value::Null      => "null".to_string(),
+        Value::Ref(rc) => {
+            match value_to_str(vec![rc.borrow().clone()])? {
+                Value::Str(s) => s,
+                _ => return Err("Expected string".to_string()),
+            }
+        }
         Value::EnumVariant(e, v) => format!("{}.{}", e, v),
         Value::List(items) => {
             let mut parts = Vec::new();
