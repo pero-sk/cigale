@@ -44,8 +44,6 @@ download ```cigale.bat``` from releases.
 cigale.bat install
 ```
 
-Please note that by default (running without a specific version), the install subcommand will install 0.1.0 and not latest.
-
 Restart your terminal after installing. Cigale will be available as `cigale` in your PATH.
 
 ### Specific version
@@ -85,6 +83,7 @@ cigale.bat install <branch>       # Windows
 | `bool` | Boolean |
 | `list<T>` | Typed list |
 | `list` | Untyped list |
+| `ref<T>` | Reference |
 
 ### Variables
 
@@ -99,6 +98,8 @@ int n = null;
 list<str> names = ["alice", "bob"];
 list<str|int> mixed = ["hello", 1];
 list anything = [1, "two", 3.0f];
+
+ref<int> r = &n;
 ```
 
 ### Strings
@@ -245,6 +246,23 @@ inst direction { NORTH, SOUTH, EAST, WEST }
 direction d = direction.NORTH;
 ```
 
+### Reference types
+
+```
+int a = 4;
+
+ref<int> r = &a; // r now holds a reference to `a`.
+
+// if modified alongside dereferenced, the original variable `a` gets changed too.
+
+for(int i = 0, i < 10, i += 1) {
+    *r = i // to derefence, use * before the ref variable
+}
+
+cout(a<str>) // will print 9.
+
+```
+
 ### Access Modifiers
 
 ```
@@ -374,10 +392,10 @@ import stdl.io { open, perm, file };
 import stdl.err { result };
 
 result<file> f = open("path/to/file.txt", perm.RWP);
-if (f.err != null) {
+if (f.is_err()) {
     // handle error
 } else {
-    file handle = f.val;
+    file handle = f.get();
     result<str> content = handle.read();
     handle.write("hello!");
     handle.append(" world");
