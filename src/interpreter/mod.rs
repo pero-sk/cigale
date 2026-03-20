@@ -547,6 +547,8 @@ impl Interpreter {
             Value::Null => false,
             Value::Int(n) => *n != 0,
             Value::Str(s) => !s.is_empty(),
+            Value::Float(f) => *f != 0.0f32,
+            Value::Double(d) => *d != 0.0f64,
             _ => true,
         }
     }
@@ -1019,7 +1021,16 @@ impl Interpreter {
             },
             // logical
             BinaryOp::And => Ok(Value::Bool(self.is_truthy(&lval) && self.is_truthy(&rval))),
-            BinaryOp::Or  => Ok(Value::Bool(self.is_truthy(&lval) || self.is_truthy(&rval))),
+            BinaryOp::Or  => {
+                // if we check the first one, we can remove some redundency from checking the second one.
+                if (self.is_truthy(&lval)) {
+                    return Ok(Value::Bool(true));
+                } else if (self.is_truthy(&rval)) {
+                    return Ok(Value::Bool(true));
+                } else {
+                    return Ok(Value::Bool(false));
+                }
+            },
             // bitwise
             BinaryOp::XOR => match (lval, rval) {
                 (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a ^ b)),
