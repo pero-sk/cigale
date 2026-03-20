@@ -901,6 +901,22 @@ impl Interpreter {
                     _ => return Err("invalid compound assignment target".to_string()),
                 }
             }
+            BinaryOp::And => {
+                let lval = self.eval_expr(left)?;
+                if !self.is_truthy(&lval) {
+                    return Ok(Value::Bool(false));
+                }
+                let rval = self.eval_expr(right)?;
+                return Ok(Value::Bool(self.is_truthy(&rval)));
+            }
+            BinaryOp::Or => {
+                let lval = self.eval_expr(left)?;
+                if self.is_truthy(&lval) {
+                    return Ok(Value::Bool(true));
+                }
+                let rval = self.eval_expr(right)?;
+                return Ok(Value::Bool(self.is_truthy(&rval)));
+            }
             _ => {}
         }
 
@@ -1018,18 +1034,6 @@ impl Interpreter {
                 (Value::Double(a), Value::Int(b))    => Ok(Value::Bool(a >= b as f64)),
                 (Value::Int(a),    Value::Double(b)) => Ok(Value::Bool((a as f64) >= b)),
                 (a, b) => Err(format!("cannot compare {:?} and {:?}", a, b)),
-            },
-            // logical
-            BinaryOp::And => Ok(Value::Bool(self.is_truthy(&lval) && self.is_truthy(&rval))),
-            BinaryOp::Or  => {
-                // if we check the first one, we can remove some redundency from checking the second one.
-                if (self.is_truthy(&lval)) {
-                    return Ok(Value::Bool(true));
-                } else if (self.is_truthy(&rval)) {
-                    return Ok(Value::Bool(true));
-                } else {
-                    return Ok(Value::Bool(false));
-                }
             },
             // bitwise
             BinaryOp::XOR => match (lval, rval) {
