@@ -400,8 +400,10 @@ impl Analyser {
             Expr::DerefExpr(expr) => {
                 self.analyse_expr(expr.as_ref());
             }
+            _ => {}
 
-            _ => {println!("Warning: undefined analysis behaviour for: {}", expr_to_str(expr))}
+            // only uncomment for debug
+            // _ => {println!("Warning: undefined analysis behaviour for: {}", expr_to_str(expr))}
         }
     }
 
