@@ -797,6 +797,8 @@ impl Interpreter {
             }
             (Value::Bool(b), Type::Str) => {if b {Ok(Value::Str("true".to_string()))} else {Ok(Value::Str("false".to_string()))}}
             
+            (Value::EnumVariant(_, a), Type::Str) => {Ok(Value::Str(a))}
+
             (v, t) => {
                 if self.type_matches(t, &v) {
                     Ok(v)
