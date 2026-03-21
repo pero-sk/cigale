@@ -463,21 +463,30 @@ impl Parser {
                 // list<T> or list<T|U> or untyped list
                 if n == "list" {
                     if let Some(Token::Lesser) = self.current() {
-                        self.advance(); // consume '<'
+                        self.advance();
                         let mut types = Vec::new();
+                        let mut closed_outer = false;
                         loop {
                             types.push(self.parse_type()?);
                             match self.current() {
                                 Some(Token::OR) => { self.advance(); }
-                                Some(Token::Greater) => break,
+                                Some(Token::Greater) => { self.advance(); break; }
+                                Some(Token::RBS) => {
+                                    // >> closes both list<> and outer <>
+                                    self.tokens[self.pos] = Token::Greater;
+                                    closed_outer = true;
+                                    break;
+                                }
                                 Some(t) => return Err(format!("expected '|' or '>' in list type but got {:?}", t)),
                                 None => return Err("expected '|' or '>' in list type but got EOF".to_string()),
                             }
                         }
-                        self.expect(&Token::Greater, "parse_type::list::rangle")?;
+                        if !closed_outer {
+                            // already consumed the > above
+                        }
                         return Ok(Type::List(Some(types)));
                     }
-                    return Ok(Type::List(None)); // untyped list
+                    return Ok(Type::List(None));
                 }
                 // generic user type e.g. result<int>
                 if let Some(Token::Lesser) = self.current() {
