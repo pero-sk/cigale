@@ -866,6 +866,32 @@ impl Interpreter {
                             _ => return Err("cannot assign to index of non-identifier".to_string()),
                         }
                     }
+                    Expr::MethodCall { object, method, args } => {
+                        // obj.field = value  (field assignment, no args)
+                        if !args.is_empty() {
+                            return Err("cannot assign to a method call with arguments".to_string());
+                        }
+                        match *object {
+                            Expr::Identifier(var_name) => {
+                                let instance = self.env.get(&var_name)
+                                    .ok_or_else(|| format!("undefined variable: {}", var_name))?
+                                    .clone();
+                                match instance {
+                                    Value::Instance { class_name, mut fields, parent } => {
+                                        fields.insert(method, val);
+                                        self.env.assign(&var_name, Value::Instance {
+                                            class_name,
+                                            fields,
+                                            parent,
+                                        });
+                                        return Ok(Value::Null);
+                                    }
+                                    _ => return Err(format!("'{}' is not an instance", var_name)),
+                                }
+                            }
+                            _ => return Err("cannot assign to field of a non-variable".to_string()),
+                        }
+                    }
                     _ => return Err("invalid assignment target".to_string()),
                 }
             }
