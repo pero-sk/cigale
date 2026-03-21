@@ -40,24 +40,24 @@ fn run(file: &str) {
 
     println!("{:#?}", program);
 
-    // let mut analyser = Analyser::new();
-    // let issues = analyser.analyse(&program);
+    let mut analyser = Analyser::new();
+    let issues = analyser.analyse(&program);
 
-    // let mut has_errors = false;
-    // for issue in issues {
-    //     match issue {
-    //         analyser::AnalysisError::Error(e) => {
-    //             eprintln!("Error: {}", e);
-    //             has_errors = true;
-    //         }
-    //         analyser::AnalysisError::Warning(w) => {
-    //             eprintln!("Warning: {}", w);
-    //         }
-    //     }
-    // }
-    // if has_errors {
-    //     return;
-    // }
+    let mut has_errors = false;
+    for issue in issues {
+        match issue {
+            analyser::AnalysisError::Error(e) => {
+                eprintln!("Error: {}", e);
+                has_errors = true;
+            }
+            analyser::AnalysisError::Warning(w) => {
+                eprintln!("Warning: {}", w);
+            }
+        }
+    }
+    if has_errors {
+        return;
+    }
 
 
     let interpreter = Arc::new(Mutex::new(Interpreter::new()));

@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 #[cfg(feature = "stdl")]
 use std::collections::HashSet;
-use std::ops::Deref;
 use std::rc::Rc;
 #[cfg(feature = "stdl")]
 use std::sync::Mutex;
