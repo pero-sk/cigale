@@ -828,27 +828,13 @@ impl Interpreter {
                         return Ok(val);
                     }
                     Expr::DerefExpr(inner) => {
-                        match *inner {
-                            Expr::Identifier(name) => {
-                                let ref_val = self.env.get(&name)
-                                    .ok_or_else(|| format!("undefined variable: {}", name))?
-                                    .clone();
-                                match ref_val {
-                                    Value::Ref(rc) => {
-                                        *rc.borrow_mut() = val.clone();
-                                        // update original variable in env
-                                        for (var_name, var_rc) in &self.refs {
-                                            if Rc::ptr_eq(var_rc, &rc) {
-                                                self.env.assign(var_name, val.clone());
-                                                break;
-                                            }
-                                        }
-                                        return Ok(val);
-                                    }
-                                    _ => return Err(format!("{} is not a ref", name)),
-                                }
+                        let ref_val = self.eval_expr(*inner)?;
+                        match ref_val {
+                            Value::Ref(rc) => {
+                                *rc.borrow_mut() = val.clone();
+                                return Ok(val);
                             }
-                            _ => return Err("cannot deref non-identifier".to_string()),
+                            _ => return Err("cannot deref non-ref".to_string()),
                         }
                     }
                     Expr::IndexExpr { object, index } => {
@@ -926,6 +912,16 @@ impl Interpreter {
                             return Err(format!("undefined variable: {}", name));
                         }
                         return Ok(val);
+                    }
+                    Expr::DerefExpr(inner) => {
+                        let ref_val = self.eval_expr(*inner)?;
+                        match ref_val {
+                            Value::Ref(rc) => {
+                                *rc.borrow_mut() = val.clone();
+                                return Ok(val);
+                            }
+                            _ => return Err("cannot deref non-ref".to_string()),
+                        }
                     }
                     _ => return Err("invalid compound assignment target".to_string()),
                 }
