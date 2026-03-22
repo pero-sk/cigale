@@ -150,9 +150,11 @@ impl Environment {
     }
 
     fn get(&self, name: &str) -> Option<&Value> {
-        self.vars.get(name).or_else(|| {
+        let x = self.vars.get(name).or_else(|| {
             self.parent.as_ref()?.get(name)
-        })
+        });
+        // println!("{:?}", x);
+        x
     }
 
     fn set(&mut self, name: &str, value: Value) {
@@ -352,7 +354,7 @@ impl Interpreter {
                 };
 
                 let source = match std::fs::read_to_string(&file_path) {
-                    Ok(s) => s,
+                    Ok(s) => s.replace("\r\n", "\n").replace('\r', "\n"),
                     Err(e) => return Err(ExecError::Error(format!("failed to load import '{}': {}", file_path, e))),
                 };
                 
@@ -1020,7 +1022,7 @@ impl Interpreter {
                 (a, b) => Err(format!("cannot exponentiate {:?} and {:?}", a, b)),
             },
             // comparison
-            BinaryOp::Equal    => Ok(Value::Bool(self.values_equal(&lval, &rval))),
+            BinaryOp::Equal    => {Ok(Value::Bool(self.values_equal(&lval, &rval)))},
             BinaryOp::NotEqual => Ok(Value::Bool(!self.values_equal(&lval, &rval))),
             BinaryOp::Less => match (lval, rval) {
                 (Value::Int(a),    Value::Int(b))    => Ok(Value::Bool(a < b)),
