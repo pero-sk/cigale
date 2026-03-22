@@ -618,11 +618,17 @@ impl Interpreter {
             }
 
             Expr::Identifier(name) => {
-                // check env first
                 if let Some(v) = self.env.get(&name) {
+                    // if it's already a Ref, return it as-is (don't look in self.refs)
+                    if matches!(v, Value::Ref(_)) {
+                        return Ok(v.clone());
+                    }
+                    // if there's a ref registered for this name, read from Rc
+                    if let Some(rc) = self.refs.get(&name) {
+                        return Ok(rc.borrow().clone());
+                    }
                     return Ok(v.clone());
                 }
-                // check if it's an enum type name e.g. perm, colour
                 if self.enums.contains_key(&name) {
                     return Ok(Value::Identifier(name));
                 }
