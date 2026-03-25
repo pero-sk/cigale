@@ -1099,8 +1099,9 @@ impl Interpreter {
         }
     }
 
-   pub fn eval_function_call(&mut self, name: String, args: Vec<Expr>) -> Result<Value, String> {
+    pub fn eval_function_call(&mut self, name: String, args: Vec<Expr>) -> Result<Value, String> {
         // evaluate args first
+
         let mut arg_vals = Vec::new();
         for arg in args {
             arg_vals.push(self.eval_expr(arg)?);
@@ -1117,6 +1118,9 @@ impl Interpreter {
         // check if it's a class instantiation
         if self.classes.contains_key(&name) {
             let class = self.classes.get(&name).unwrap().clone();
+            if !class.is_inst {
+                return Err(format!("{} is not an instantiable class.", class.name));
+            }
             let mut fields = HashMap::new();
 
             // initialize parent fields first if class has a parent
@@ -1154,11 +1158,28 @@ impl Interpreter {
                 }
             }
 
-            return Ok(Value::Instance {
+            let fieldsclone = fields.clone();
+
+            let mut instance = Value::Instance {
                 class_name: name,
                 parent: class.parent.clone(),
                 fields,
-            });
+            };
+
+            if fieldsclone.contains_key("init") {
+                self.env.set("__tmp__", instance.clone());
+
+                let _ = self.eval_instance_method(
+                    &Expr::Identifier("__tmp__".to_string()),
+                    instance.clone(),
+                    "init".to_string(),
+                    arg_vals.clone(),
+                )?;
+
+                instance = self.env.get("__tmp__").unwrap().clone();
+            }
+
+            return Ok(instance);
         }
 
         // check if it's an enum variant used as constructor
