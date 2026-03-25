@@ -914,6 +914,10 @@ impl Interpreter {
                 let val = self.eval_binary(left.clone(), base_op, right)?;
                 match left {
                     Expr::Identifier(name) => {
+                        // update Rc if registered
+                        if let Some(rc) = self.refs.get(&name).cloned() {
+                            *rc.borrow_mut() = val.clone();
+                        }
                         if !self.env.assign(&name, val.clone()) {
                             return Err(format!("undefined variable: {}", name));
                         }
