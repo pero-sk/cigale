@@ -129,7 +129,8 @@ fn file_read(handle: Arc<Mutex<FileHandle>>) -> Result<Value, String> {
     let mut content = String::new();
     file.read_to_string(&mut content)
         .map_err(|e| format!("read error: {}", e))?;
-    Ok(make_ok_result(Value::Str(content.replace("\r\n", "\n").replace('\r', "\n"))))
+    let san_content = content.replace("\r\n", "\n").replace('\r', "\n");
+    Ok(make_ok_result(Value::Str(san_content)))
 }
 
 fn file_write(handle: Arc<Mutex<FileHandle>>, args: Vec<Value>) -> Result<Value, String> {
