@@ -1167,11 +1167,11 @@ impl Interpreter {
             };
 
             if fieldsclone.contains_key("init") {
-                self.env.set("__tmp__", instance.clone());
+                self.env.set("__tmp__", instance);
 
                 let _ = self.eval_instance_method(
                     &Expr::Identifier("__tmp__".to_string()),
-                    instance.clone(),
+                    self.env.get("__tmp__").unwrap().clone(),
                     "init".to_string(),
                     arg_vals.clone(),
                 )?;
